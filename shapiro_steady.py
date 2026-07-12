@@ -63,16 +63,17 @@ def solve_steady_yc(p = params):
 
     return jax.vmap(yc_sol.evaluate)
 
-#Flow field can be first evaluated along x
-x = jnp.linspace(0.0, float(boundary), 100)
-y = jnp.linspace(-1.1*D, 1.1*D, 100)
-X, Y = jnp.meshgrid(x, y)
-yc_x1 = yc_steady1(x)
-yc_x2 = yc_steady2(x)
-u1_x = u1_steady(x)
-u2_x = u2_steady(x)
 
 if __name__ == "__main__":
+
+    #Flow field can be first evaluated along x
+    x = jnp.linspace(0.0, float(boundary), 100)
+    y = jnp.linspace(-1.1*D, 1.1*D, 100)
+    X, Y = jnp.meshgrid(x, y)
+    yc_x1 = yc_steady1(x)
+    yc_x2 = yc_steady2(x)
+    u1_x = u1_steady(x)
+    u2_x = u2_steady(x)
     # Wake expansion effects onto 2D
     def sigma_y(x):
         return sigma0 * dw(x)
