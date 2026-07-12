@@ -220,6 +220,9 @@ __marimo__/
 .streamlit/secrets.toml
 
 # some extra output stuff
-.png
-.gif
-.mp4
+*.png
+*.gif
+*.mp4
+
+# This is just for ignoring some local stuff
+steady_state_debug.py
