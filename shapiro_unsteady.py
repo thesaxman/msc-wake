@@ -12,6 +12,7 @@ plt.rcParams["text.usetex"] = True
 from matplotlib.animation import FuncAnimation
 from model_params import *
 from diffrax import diffeqsolve, Tsit5, ODETerm, SaveAt, PIDController
+
 from shapiro_steady import yc_x1, x as steady_x, u1_x, u2_x
 
 #defining the wake expansion function and its derivative

@@ -24,11 +24,17 @@ class WakeParams(eqx.Module):
     sigma0_ratio: float = 0.235
     boundary_diams: float = 20.0
     
+    @property
     def sigma0(self):
         return self.sigma0_ratio* self.D
     
+    @property
     def boundary(self):
         return self.boundary_diams * self.D
+    
+    @property
+    def upstream_bound(self):
+        return self.D *-4.0
 
     
 def dw(x, p:WakeParams):
