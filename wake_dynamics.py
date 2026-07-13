@@ -35,6 +35,10 @@ class WakeParams(eqx.Module):
     @property
     def upstream_bound(self):
         return self.D *-4.0
+    
+    @property
+    def t1(self):
+        return 2.0 * (self.boundary - self.upstream_bound)/self.UINF
 
     
 def dw(x, p:WakeParams):
