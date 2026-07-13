@@ -48,3 +48,13 @@ def dA_dx(x, p: WakeParams):
 
 def G(x, p:WakeParams):
     return gaussian_forcing(x,p.D)
+
+def sigma_y(x, p):
+    return p.sigma0 * dw(x,p)
+
+def gaussian(x, yc, y, p):
+    return 0.5 * (p.D / 2 / p.sigma0)**2 * \
+        jnp.exp(-0.5 * ((y - yc) / sigma_y(x, p))**2)
+
+def u_point(x, yc, u1, y, p):
+    return u1 * gaussian(x, yc, y, p)
