@@ -11,21 +11,7 @@ import matplotlib.pyplot as plt
 from diffrax import diffeqsolve, Tsit5, ODETerm, SaveAt, PIDController
 
 from model_params import params
-from wake_dynamics import dw, A, dA_dx, G
-
-""" def wake_expansion(x, D, kw): # General wake expansion function
-    return 1+kw*jnp.log(1+jnp.exp(2*(x-D)/D))
-def dw(x): # Wake expansion with flow parameters specified
-    return wake_expansion(x, D, kw)
-def A(x): # Wake area function
-    return jnp.pi * D ** 2 / 4 * dw(x) ** 2
-dA_dx = jax.grad(A)
-gamma_rad = jnp.radians(gamma)
-cos_gamma = jnp.cos(gamma_rad)
-sin_gamma = jnp.sin(gamma_rad)
-def G(x):
-    return 1/(jnp.sqrt(2*jnp.pi)*D/2) * jnp.exp(-0.5 * (x)**2 / (D/2)**2)
- """
+from wake_dynamics import A, dA_dx, G
 
 
 def solve_steady_u1(p):
