@@ -127,7 +127,7 @@ ax_u1.set_ylabel(r'$u_1$ [m/s]')
 
 u2_line_unsteady, = ax_u2.plot(x/params.D, u2_xt[0], lw=1.2)
 ax_u2.plot(x/params.D, u2_x, 'r--', lw=1.2)
-ax_u2.set_ylim(min(u2_xt.min(), u2_x.min()), 1.1*max(u2_xt.max(), u2_x.max()))
+ax_u2.set_ylim(1.1*min(u2_xt.min(), u2_x.min()), 1.1*max(u2_xt.max(), u2_x.max()))
 ax_u2.set_ylabel(r'$u_2$ [m/s]')
 
 
