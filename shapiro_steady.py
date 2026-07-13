@@ -40,9 +40,10 @@ def solve_steady_u2(p):
 
     return u2_sol.evaluate
 
-def solve_steady_yc(p):
+def solve_steady_yc(p, u2 = None):
     
-    u2 = solve_steady_u2(p=p)
+    if u2 is None:
+        u2 = solve_steady_u2(p)
     # This function defines the ODE for the wake centreline deflection
     def dyc_dx(x, y, args):
         return -u2(x) / p.UINF # taking streamwise aligned coordinate
@@ -58,14 +59,16 @@ if __name__ == "__main__":
     #Flow field can be first evaluated along x
     x = jnp.linspace(0.0, params.boundary, 100)
     y = jnp.linspace(-1.1*params.D, 1.1*params.D, 100)
-    yc_x = jax.vmap(solve_steady_yc(params))(x)
     u1_x = jax.vmap(solve_steady_u1(params))(x)
-    u2_x = jax.vmap(solve_steady_u2(params))(x)
+    u2 = solve_steady_u2(params)
+    u2_x = jax.vmap(u2)(x)
+    yc_x = jax.vmap(solve_steady_yc(params, u2=u2))(x)
     X, Y = jnp.meshgrid(x, y)
     
     from wake_dynamics import u_point, dw
 
     u1_field = jax.vmap(u_point, in_axes=(0,0,0,None,None), out_axes=1)(x, yc_x, u1_x, y,params)
+    #u2_field = jax.vmap(u_point, in_axes = (0,0,0,None,None), out_axes = 1)(x, yc_x, u2_x, y, params)
     
     # closed form solution for comparison
     
@@ -79,18 +82,17 @@ if __name__ == "__main__":
     u2_0 = params.UINF*(0.25 * params.Ct * cos_gamma**2 * sin_gamma)
     def u2_closed(x):
         return u2_0/(dw(x,params)**2)*0.5*(1+ jax.scipy.special.erf(x/(params.D/2*jnp.sqrt(2))))
-    def dyc_dx(x, y, args):
-        return -u2_closed(x) / params.UINF
-    yc_sol = diffeqsolve(ODETerm(dyc_dx), Tsit5(), t0=params.upstream_bound, t1=params.boundary, dt0=0.01, y0=0., saveat=SaveAt(dense=True), stepsize_controller=PIDController(rtol=1e-7, atol=1e-7))
-    yc_closed = jax.vmap(yc_sol.evaluate)(x)
+    yc_closed = jax.vmap(solve_steady_yc(params, u2=u2_closed))(x)
 
     u1_closed_field = jax.vmap(u_point, in_axes=(0,0,0,None,None), out_axes=1)(x, yc_closed, u1_closed, y, params)
+    #u2_closed_field = jax.vmap(u_point, in_axes=(0,0,0,None,None), out_axes=1)(x, yc_closed, u2_closed(x), y, params)
+    
     
     # --- plot ---
-    fig, axes = plt.subplots(4, 1, figsize=(12, 11), sharex=True, layout = 'constrained')
+    fig, axes = plt.subplots(5, 1, figsize=(12, 11), sharex=True, layout = 'constrained')
     
     
-    # velocity deficit field
+    # streamwise deficit field
     u1_norm = u1_field/params.UINF
     cf = axes[0].pcolormesh(X/params.D, Y/params.D, u1_norm, cmap='RdBu_r', shading='auto')
     axes[0].plot(x/params.D, yc_x/params.D, color='white', linestyle='dashed', linewidth=1.5,
@@ -100,31 +102,44 @@ if __name__ == "__main__":
     axes[0].set_title(r'Streamwise velocity deficit ($\gamma$ = {:.1f}°)'.format(params.gamma_deg))
     axes[0].legend()
     
+    # Comparing deficits from solver to closed form solutions
     u1_closed_norm = u1_closed_field/params.UINF
-    # Comparing deficit from solver to closed form solution
-    cf2 = axes[1].pcolormesh(X/params.D, Y/params.D, (u1_norm - u1_closed_norm), cmap='RdBu_r', shading='auto')
-    plt.colorbar(cf2, ax=axes[1], location='top', shrink=0.5, label=r'$\Delta u/U_\infty$ — vs closed form')
+    residual1 = u1_norm - u1_closed_norm
+    m1 = float(jnp.max(jnp.abs(residual1)))
+    cf_diff1 = axes[1].pcolormesh(X/params.D, Y/params.D, residual1, cmap='RdBu_r', shading='auto', vmin = -m1, vmax = m1)
+    plt.colorbar(cf_diff1, ax=axes[1], location='top', shrink=0.5, label=r'$\Delta u/U_\infty$ — vs closed form')
     axes[1].set_ylabel(r'$y/D$')
-    axes[1].set_title('Difference in velocity deficit to closed form solution')
-    axes[1].set_xlabel(r'$x/D$')
+    axes[1].set_title('Difference in streamwise velocity deficit to closed form solution')
+    print(f"max |Δu|/U∞ = {m1:.2e}")
+    
+    u2_norm = u2_x/params.UINF
+    u2_closed_norm = u2_closed(x)/params.UINF
+    residual2 = u2_norm - u2_closed_norm
+    m2 = float(jnp.max(jnp.abs(residual2)))
+    axes[2].plot(x/params.D, residual2, color = 'red', linewidth=1.5, label = r'$\Delta v/U_infty$ - vs closed form')
+    axes[2].set_ylabel(r'$\Delta v/U_\infty$')
+    axes[2].set_title('Difference in spanwise velocity deficit to closed form solution')
+    print(f"max |Δv|/U∞ = {m2:.2e}")
 
 
     # centreline trajectory alone
-    axes[2].plot(x/params.D, yc_x/params.D, color='steelblue', linestyle='dashed', linewidth=1.5,
+    axes[3].plot(x/params.D, yc_x/params.D, color='steelblue', linestyle='dashed', linewidth=1.5,
                 label=r'Wake centreline $y_c(x)$')
+    axes[3].plot(x/params.D, yc_closed/params.D, color = 'black', linestyle = 'solid', linewidth = 1.5, label= r'Closed-form Wake centreline')
     
-    axes[2].set_ylabel(r'$y_c/D$')
-    axes[2].set_title(r'Wake centreline deflection')
-    axes[2].legend()    
+    axes[3].set_ylabel(r'$y_c/D$')
+    axes[3].set_title(r'Wake centreline deflection')
+    axes[3].legend()    
     
     
     #Comparing the trajectory from solver to closed form solution
-    axes[3].plot(x/params.D, jnp.abs(yc_closed-yc_x)/params.D, color = 'red',linewidth = 1.5, label = r'Wake centreline difference $\Delta y_c(x)$' )
-    axes[3].set_title('Wake centreline difference')
-    axes[3].set_ylabel(r'$\Delta y_c/D$')
-    axes[3].set_xlabel(r'$x/D$')
-    axes[3].legend()
+    axes[4].plot(x/params.D, jnp.abs(yc_closed-yc_x)/params.D, color = 'red',linewidth = 1.5, label = r'Wake centreline difference $\Delta y_c(x)$' )
+    axes[4].set_title('Wake centreline difference')
+    axes[4].set_ylabel(r'$\Delta y_c/D$')
+    axes[4].legend()
+    print(f"max Δyc/D = {float(jnp.max(jnp.abs(yc_closed-yc_x))/params.D):.2e}")
     
     axes[0].set_xlim(0,12)
+    axes[-1].set_xlabel(r'$x/D$')
     #plt.savefig("outputs/wake_field_2d.png", dpi=150)
     plt.show()
