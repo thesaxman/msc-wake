@@ -11,4 +11,4 @@ params = WakeParams(
     kw = 0.0834, 
     Ct=0.8, 
     gamma_deg =-20.0, 
-    UINF=0.8)
+    UINF=8.0)
