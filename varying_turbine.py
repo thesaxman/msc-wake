@@ -8,11 +8,11 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 plt.rcParams["text.usetex"] = True
-from model_params import *
+from model_params import params
 from diffrax import diffeqsolve, Tsit5, ODETerm, SaveAt, PIDController
-from shapiro_steady import yc_x1 as yc_steady, x as steady_x, u1_x, u2_x
 
-gamma0_rad = jnp.radians(gamma0)
+
+gamma0_rad = jnp.radians(params.gamma_deg)
 gamma_amplitude_rad = jnp.radians(30)
 gamma_frequency = 0.01827665508523  # Frequency of the sinusoidal variation in Hz
 
