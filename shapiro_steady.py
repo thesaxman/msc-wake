@@ -89,7 +89,7 @@ if __name__ == "__main__":
     
     
     # --- plot ---
-    fig, axes = plt.subplots(5, 1, figsize=(12, 11), sharex=True, layout = 'constrained')
+    fig, axes = plt.subplots(5, 1, figsize=(12, 14), sharex=True, layout = 'constrained')
     
     
     # streamwise deficit field
@@ -141,5 +141,5 @@ if __name__ == "__main__":
     
     axes[0].set_xlim(0,12)
     axes[-1].set_xlabel(r'$x/D$')
-    #plt.savefig("outputs/wake_field_2d.png", dpi=150)
-    plt.show()
+    plt.savefig("outputs/full_wake_comparisons.png", dpi=150)
+    #plt.show()
