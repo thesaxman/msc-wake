@@ -39,6 +39,12 @@ class WakeParams(eqx.Module):
     @property
     def t1(self):
         return 2.0 * (self.boundary - self.upstream_bound)/self.UINF
+    @property
+    def gamma(self):
+        return jnp.radians(self.gamma_deg)
+    
+    def gamma_control(self, t, cont_fun):
+        return cont_fun(t, self.gamma)
 
     
 def dw(x, p:WakeParams):
