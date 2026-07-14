@@ -6,7 +6,7 @@ control parameters.
 
 
 from wake_dynamics import WakeParams
-params = WakeParams(
+wake_params = WakeParams(
     D = 126.0, 
     kw = 0.0834, 
     Ct=0.8, 
