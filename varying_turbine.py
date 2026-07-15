@@ -78,8 +78,12 @@ def make_rhs(p, x_grid):
 
 
 if __name__ == "__main__":
-    
-    y0 = (jnp.zeros(nx), jnp.zeros(nx), jnp.zeros(nx))
+    import shapiro_steady as ss
+    u1_x = jax.vmap(ss.solve_steady_u1(wake_params))(x)
+    u2_steady = ss.solve_steady_u2(wake_params)
+    u2_x = jax.vmap(u2_steady)(x)
+    yc_x = jax.vmap(ss.solve_steady_yc(wake_params, u2_steady))(x)
+    y0 = (u1_x, u2_x, yc_x)
 
     u1_xt, u2_xt, yc_xt = solver(ts, y0, make_rhs(wake_params, x)).ys
     y = jnp.linspace(-3*wake_params.D, 3*wake_params.D, 100)
@@ -130,7 +134,7 @@ if __name__ == "__main__":
         u1_line.set_ydata(u1_xt[i])
         u2_line.set_ydata(u2_xt[i])
         yc_line.set_ydata(yc_xt[i])
-        timestamp.set_text(rf"$\gamma$ = {wake_params.gamma_deg:.1f}°, t = {ts[i]:.0f} s")
+        timestamp.set_text(rf"$\gamma_0$ = {wake_params.gamma_deg:.1f}°, t = {ts[i]:.0f} s")
         return mesh, cl_line, u1_line, u2_line, yc_line, timestamp
 
 
