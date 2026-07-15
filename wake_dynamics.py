@@ -12,8 +12,9 @@ def wake_expansion(x, D, kw): # General wake expansion function (might later add
 def wake_area(x, D, kw): # Wake area function:
     return jnp.pi * D ** 2 / 4 * wake_expansion(x, D, kw) ** 2
 
+_d_wake_area_dx = jax.grad(wake_area, argnums=0) # less expensive to calculate here
 def d_wake_area_dx(x, D, kw): # x derivative of the wake area expansion
-    return jax.grad(wake_area, argnums = 0)(x, D, kw)
+    return _d_wake_area_dx(x, D, kw)
 
 def gaussian_forcing(x, D): # Gaussian forcing function replacing Dirac delta function
     return 1/(jnp.sqrt(2*jnp.pi)*D/2) * jnp.exp(-0.5 * (x)**2 / (D/2)**2)
@@ -29,6 +30,7 @@ class WakeParams(eqx.Module):
     UINF:   float
     sigma0_ratio: float = 0.235
     boundary_diams: float = 20.0
+    upstream_diams: float = -4.0
     gamma_fn: Callable = eqx.field(static = True, default = constant_gamma)
     
     @property
@@ -41,7 +43,7 @@ class WakeParams(eqx.Module):
     
     @property
     def upstream_bound(self):
-        return self.D *-4.0
+        return self. upstream_diams * self.D
     
     @property
     def t1(self):
@@ -50,9 +52,12 @@ class WakeParams(eqx.Module):
     def gamma(self):
         return jnp.radians(self.gamma_deg)
     
+    def gamma_at(self, t):
+        """Yaw angle (in radians) at time t, via the configured control law."""
+        return self.gamma_fn(t, self.gamma)
 
     
-def dw(x, p:WakeParams):
+def dw(x, p: WakeParams):
     return wake_expansion(x, p.D, p.kw)
 
 def A(x, p: WakeParams):
@@ -61,15 +66,15 @@ def A(x, p: WakeParams):
 def dA_dx(x, p: WakeParams):
     return d_wake_area_dx(x, p.D, p.kw)
 
-def G(x, p:WakeParams):
+def G(x, p: WakeParams):
     return gaussian_forcing(x,p.D)
 
-def sigma_y(x, p):
+def sigma_y(x, p: WakeParams):
     return p.sigma0 * dw(x,p)
 
-def gaussian(x, yc, y, p):
+def gaussian(x, yc, y, p: WakeParams):
     return 0.5 * (p.D / 2 / p.sigma0)**2 * \
         jnp.exp(-0.5 * ((y - yc) / sigma_y(x, p))**2)
 
-def u_point(x, yc, u1, y, p):
+def u_point(x, yc, u1, y, p: WakeParams):
     return u1 * gaussian(x, yc, y, p)
