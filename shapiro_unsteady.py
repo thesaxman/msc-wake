@@ -32,7 +32,7 @@ G_x = G(x,wake_params)                            # precompute the Gaussian forc
 
 def delta_u1_0(p):
     return p.UINF*(1.0-jnp.sqrt(1-p.Ct*cos_gamma**2))
-S1 = DELTA_U1_0(wake_params)*wake_params.UINF
+S1 = delta_u1_0(wake_params)*wake_params.UINF
 DELTA_U2_0 = wake_params.UINF*(1.0/4.0*wake_params.Ct*cos_gamma**2*sin_gamma)
 S2 = DELTA_U2_0*wake_params.UINF
 
