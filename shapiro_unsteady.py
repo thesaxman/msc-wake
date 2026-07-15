@@ -99,7 +99,7 @@ if __name__ == "__main__":
 
     def separate_wake_video(): # will fix later
         
-        raise NotImplementedError(" rebuild artists")
+        raise NotImplementedError("rebuild artists")
         
         fig, ax = plt.subplots(figsize=(10, 4))
 
