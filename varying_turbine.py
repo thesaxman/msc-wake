@@ -56,7 +56,7 @@ def S2(t,p):
     return wake_params.UINF*( 1.0/4.0 * wake_params.Ct * jnp.cos(gamma_t(t,p.gamma))**2 * jnp.sin(gamma_t(t,p.gamma)))
 
 
-from shapiro_unsteady import solver, d_dx, expansion, ts, nx, x
+from shapiro_unsteady import solver, d_dx, expansion, ts, x
 
 def make_rhs(p, x_grid):
     

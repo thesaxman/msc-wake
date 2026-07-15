@@ -66,6 +66,9 @@ def A(x, p: WakeParams):
 def dA_dx(x, p: WakeParams):
     return d_wake_area_dx(x, p.D, p.kw)
 
+def expansion(x_grid, p): # to compute the expansion term w(x)/UINF (normalised wrt UINF so may need further fleshing out for future local velocity expansion)
+    return jax.vmap(dA_dx, in_axes=(0,None))(x_grid,p) / A(x_grid,p) 
+
 def G(x, p: WakeParams):
     return gaussian_forcing(x,p.D)
 
