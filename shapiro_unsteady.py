@@ -12,7 +12,7 @@ from matplotlib.animation import FuncAnimation
 from model_params import wake_params
 from diffrax import diffeqsolve, Tsit5, ODETerm, SaveAt, PIDController
 
-from wake_dynamics import A, dA_dx, G, u_point
+from wake_dynamics import A, dA_dx, G, u_point, WakeParams
 import shapiro_steady as ss
 from video_utils import save_video
 
@@ -25,11 +25,14 @@ nx = 800
 x = jnp.linspace(wake_params.upstream_bound, wake_params.boundary, nx)
 dx = x[1]-x[0]
 
-expansion = jax.vmap(dA_dx, in_axes=(0,None))(x,wake_params) / A(x,wake_params) # precompute the expansion term
+def expansion(x_grid, p): # compute the expansion term
+    return jax.vmap(dA_dx, in_axes=(0,None))(x_grid,p) / A(x_grid,p) 
+
 G_x = G(x,wake_params)                            # precompute the Gaussian forcing term
 
-DELTA_U1_0 = wake_params.UINF*(1.0-jnp.sqrt(1-wake_params.Ct*cos_gamma**2))
-S1 = DELTA_U1_0*wake_params.UINF
+def delta_u1_0(p):
+    return p.UINF*(1.0-jnp.sqrt(1-p.Ct*cos_gamma**2))
+S1 = delta_u1_0(wake_params)*wake_params.UINF
 DELTA_U2_0 = wake_params.UINF*(1.0/4.0*wake_params.Ct*cos_gamma**2*sin_gamma)
 S2 = DELTA_U2_0*wake_params.UINF
 
@@ -47,31 +50,34 @@ def solver(ts, y0, rhs_func):
                         stepsize_controller=stepsize_controller,
                         max_steps=max_steps)
 
+def d_dx(var, dx): 
+    """ First order upwind derivative (flow in +x); zero-gradient inflow BC at index 0. """
+    dvar_dx = (var - jnp.roll(var, 1))/dx
+    return dvar_dx.at[0].set(0.0)
 
-
-def rhs(t, state, args): # system of PDES for u1, u2, yc
+def make_rhs(p: WakeParams, x_grid):
     
-    u1, u2, yc = state
+    G_x = G(x_grid, p)
+    expansion_x = expansion(x_grid, p)
+    def rhs(t, state, args): # system of PDES for u1, u2, yc
+        
+        u1, u2, yc = state
+        
+        du1_dt = -p.UINF*d_dx(u1, dx) - p.UINF*expansion_x*u1 + S1*G_x
+        
+        du2_dt = -wake_params.UINF*d_dx(u2, dx) - wake_params.UINF*expansion_x*u2 + S2*G_x
+        
+        dyc_dt = -wake_params.UINF*d_dx(yc, dx) - u2 # u2 is coupled to the centerline deflection equation
+        
+        return (du1_dt, du2_dt, dyc_dt)
     
-    du1_dx = (u1 - jnp.roll(u1, 1)) / dx # Upwind scheme for spatial derivative
-    du1_dx = du1_dx.at[0].set(0.0) # Boundary condition at x=-4D
-    du1_dt = -wake_params.UINF*du1_dx - wake_params.UINF*expansion*u1 + S1*G_x
-    
-    du2_dx = (u2 - jnp.roll(u2, 1)) / dx # Upwind scheme for spatial derivative
-    du2_dx = du2_dx.at[0].set(0.0) # Boundary condition at x=-4D
-    du2_dt = -wake_params.UINF*du2_dx - wake_params.UINF*expansion*u2 + S2*G_x
-    
-    dyc_dx = (yc - jnp.roll(yc, 1)) / dx
-    dyc_dx = dyc_dx.at[0].set(0.0)
-    dyc_dt = -wake_params.UINF*dyc_dx - u2 # u2 is coupled to the centerline deflection equation
-    
-    return (du1_dt, du2_dt, dyc_dt)
+    return rhs
 
 if __name__ == "__main__":
 
     y0 = (jnp.zeros(nx), jnp.zeros(nx), jnp.zeros(nx))
 
-    u1_xt, u2_xt, yc_xt = solver(ts, y0, rhs).ys
+    u1_xt, u2_xt, yc_xt = solver(ts, y0, make_rhs(wake_params, x)).ys
 
 
 
@@ -93,7 +99,7 @@ if __name__ == "__main__":
 
     def separate_wake_video(): # will fix later
         
-        raise NotImplementedError(" rebuild artists")
+        raise NotImplementedError("rebuild artists")
         
         fig, ax = plt.subplots(figsize=(10, 4))
 

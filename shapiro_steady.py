@@ -10,7 +10,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffrax import diffeqsolve, Tsit5, ODETerm, SaveAt, PIDController
 
-from model_params import params
+from model_params import wake_params
 from wake_dynamics import A, dA_dx, G
 
 
