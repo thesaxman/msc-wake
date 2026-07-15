@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 import jax
 import jax.numpy as jnp
 import equinox as eqx
@@ -15,6 +17,9 @@ def d_wake_area_dx(x, D, kw): # x derivative of the wake area expansion
 def gaussian_forcing(x, D): # Gaussian forcing function replacing Dirac delta function
     return 1/(jnp.sqrt(2*jnp.pi)*D/2) * jnp.exp(-0.5 * (x)**2 / (D/2)**2)
 
+def constant_gamma(t, gamma):
+    return gamma
+
 class WakeParams(eqx.Module):
     D:      float
     kw:     float
@@ -23,6 +28,7 @@ class WakeParams(eqx.Module):
     UINF:   float
     sigma0_ratio: float = 0.235
     boundary_diams: float = 20.0
+    gamma_fn: Callable = eqx.field(static = True, default = constant_gamma)
     
     @property
     def sigma0(self):
@@ -43,8 +49,6 @@ class WakeParams(eqx.Module):
     def gamma(self):
         return jnp.radians(self.gamma_deg)
     
-    def gamma_control(self, t, cont_fun):
-        return cont_fun(t, self.gamma)
 
     
 def dw(x, p:WakeParams):
