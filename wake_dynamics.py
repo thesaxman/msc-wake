@@ -6,7 +6,8 @@ import equinox as eqx
 
 
 def wake_expansion(x, D, kw): # General wake expansion function (might later add an implementation for varying kw)
-    return 1+kw*jnp.log(1+jnp.exp(2*(x-D)/D))
+    z = 2.0 * (x-D)/D
+    return 1+kw*jnp.logaddexp(0.0,z)
 
 def wake_area(x, D, kw): # Wake area function:
     return jnp.pi * D ** 2 / 4 * wake_expansion(x, D, kw) ** 2
