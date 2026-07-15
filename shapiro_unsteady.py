@@ -12,7 +12,7 @@ from matplotlib.animation import FuncAnimation
 from model_params import wake_params
 from diffrax import diffeqsolve, Tsit5, ODETerm, SaveAt, PIDController
 
-from wake_dynamics import A, dA_dx, G, u_point
+from wake_dynamics import A, dA_dx, G, u_point, WakeParams
 import shapiro_steady as ss
 from video_utils import save_video
 
@@ -55,17 +55,17 @@ def d_dx(var, dx):
     dvar_dx = (var - jnp.roll(var, 1))/dx
     return dvar_dx.at[0].set(0.0)
 
-def make_rhs(p, x_grid):
+def make_rhs(p: WakeParams, x_grid):
     
-    
-    
+    G_x = G(x_grid, p)
+    expansion_x = expansion(x_grid, p)
     def rhs(t, state, args): # system of PDES for u1, u2, yc
         
         u1, u2, yc = state
         
-        du1_dt = -p.UINF*d_dx(u1, dx) - p.UINF*expansion*u1 + S1*G(x_grid,p)
+        du1_dt = -p.UINF*d_dx(u1, dx) - p.UINF*expansion_x*u1 + S1*G_x
         
-        du2_dt = -wake_params.UINF*d_dx(u2, dx) - wake_params.UINF*expansion*u2 + S2*G_x
+        du2_dt = -wake_params.UINF*d_dx(u2, dx) - wake_params.UINF*expansion_x*u2 + S2*G_x
         
         dyc_dt = -wake_params.UINF*d_dx(yc, dx) - u2 # u2 is coupled to the centerline deflection equation
         
@@ -77,7 +77,7 @@ if __name__ == "__main__":
 
     y0 = (jnp.zeros(nx), jnp.zeros(nx), jnp.zeros(nx))
 
-    u1_xt, u2_xt, yc_xt = solver(ts, y0, rhs).ys
+    u1_xt, u2_xt, yc_xt = solver(ts, y0, make_rhs(wake_params, x)).ys
 
 
 
