@@ -136,4 +136,4 @@ if __name__ == "__main__":
 
     ani = FuncAnimation(fig, update, frames=len(ts), interval=50, blit = True)
 
-    save_video(ani,'full_wake_evolution.mp4')
+    save_video(ani,'sinusoidal_yaw.mp4')
