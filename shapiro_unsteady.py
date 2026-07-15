@@ -12,7 +12,7 @@ from matplotlib.animation import FuncAnimation
 from model_params import wake_params
 from diffrax import diffeqsolve, Tsit5, ODETerm, SaveAt, PIDController
 
-from wake_dynamics import A, dA_dx, G, u_point, WakeParams
+from wake_dynamics import A, dA_dx, G, u_point, WakeParams, expansion
 import shapiro_steady as ss
 from video_utils import save_video
 
@@ -25,10 +25,6 @@ nx = 800
 x = jnp.linspace(wake_params.upstream_bound, wake_params.boundary, nx)
 dx = x[1]-x[0]
 
-def expansion(x_grid, p): # compute the expansion term
-    return jax.vmap(dA_dx, in_axes=(0,None))(x_grid,p) / A(x_grid,p) 
-
-G_x = G(x,wake_params)                            # precompute the Gaussian forcing term
 
 def delta_u1_0(p):
     return p.UINF*(1.0-jnp.sqrt(1-p.Ct*cos_gamma**2))
