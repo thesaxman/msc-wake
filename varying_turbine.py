@@ -16,7 +16,7 @@ from video_utils import save_video
 
 gamma0_rad = jnp.radians(wake_params.gamma_deg)
 gamma_amplitude_rad = jnp.radians(30)
-gamma_frequency = 0.01827665508523  # Frequency of the sinusoidal variation in Hz
+gamma_frequency = 1.0/300.0  # Frequency of the sinusoidal variation in Hz
 
 def sinusoidal_variation(t, x0, amplitude, frequency):
     """
@@ -134,7 +134,7 @@ if __name__ == "__main__":
         u1_line.set_ydata(u1_xt[i])
         u2_line.set_ydata(u2_xt[i])
         yc_line.set_ydata(yc_xt[i])
-        timestamp.set_text(rf"$\gamma_0$ = {wake_params.gamma_deg:.1f}°, t = {ts[i]:.0f} s")
+        timestamp.set_text(rf"$\gamma$ = {jnp.degrees(gamma_t(ts[i],wake_params.gamma)):.1f}°, t = {ts[i]:.0f} s")
         return mesh, cl_line, u1_line, u2_line, yc_line, timestamp
 
 
