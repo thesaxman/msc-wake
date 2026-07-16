@@ -99,6 +99,7 @@ if __name__ == "__main__":
     yc_xt = np.asarray(yc_xt)
     fig, axes = plt.subplots(4, 1, figsize=(10, 12), sharex=True, layout= 'constrained', gridspec_kw={'height_ratios': [2.5, 1, 1, 1]})
     ax_field, ax_u1, ax_u2, ax_yc = axes
+    
 
     #### Flow field
 

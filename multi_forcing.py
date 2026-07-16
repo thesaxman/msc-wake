@@ -96,6 +96,14 @@ if __name__ == "__main__":
     yc_xt = np.asarray(yc_xt)
     fig, axes = plt.subplots(4, 1, figsize=(10, 12), sharex=True, layout= 'constrained', gridspec_kw={'height_ratios': [2.5, 1, 1, 1]})
     ax_field, ax_u1, ax_u2, ax_yc = axes
+    
+    from matplotlib.ticker import MultipleLocator
+
+    for ax in axes: # introduce gridlines to make figures 
+        ax.xaxis.set_major_locator(MultipleLocator(5.0))
+        ax.xaxis.set_minor_locator(MultipleLocator(1.0))
+        ax.grid(True, which='major', axis='x', lw=0.6, alpha=0.5)
+        ax.grid(True, which='minor', axis='x', lw=0.3, alpha=0.25)
 
     #### Flow field
 
