@@ -96,58 +96,60 @@ u1_xt = u1_xt1 + u1_xt2
 u2_xt = u2_xt1 + u2_xt2
 yc_xt = yc_xt1 + yc_xt2
 
-y_grid = jnp.linspace(-3*wake_params.D, 3*wake_params.D, 100)
+if __name__ == "__main__":
 
-# making animation frames
-build_frame = jax.vmap(u_point, in_axes=(0,0,0,None, None), out_axes=1)
-all_frames = jax.vmap(build_frame, in_axes=(None,0,0,None, None), out_axes=0)(x_grid, yc_xt, u1_xt, y_grid, wake_params)
-assert all_frames.shape == (u1_xt.shape[0], y_grid.size, x_grid.size), all_frames.shape
-import numpy as np
-frames = np.asarray(all_frames)
-u1_xt = np.asarray(u1_xt)
-u2_xt = np.asarray(u2_xt)
-yc_xt = np.asarray(yc_xt)
-fig, axes = plt.subplots(4, 1, figsize=(10, 12), sharex=True, layout= 'constrained', gridspec_kw={'height_ratios': [2.5, 1, 1, 1]})
-ax_field, ax_u1, ax_u2, ax_yc = axes
+    y_grid = jnp.linspace(-3*wake_params.D, 3*wake_params.D, 100)
 
-#### Flow field
+    # making animation frames
+    build_frame = jax.vmap(u_point, in_axes=(0,0,0,None, None), out_axes=1)
+    all_frames = jax.vmap(build_frame, in_axes=(None,0,0,None, None), out_axes=0)(x_grid, yc_xt, u1_xt, y_grid, wake_params)
+    assert all_frames.shape == (u1_xt.shape[0], y_grid.size, x_grid.size), all_frames.shape
+    import numpy as np
+    frames = np.asarray(all_frames)
+    u1_xt = np.asarray(u1_xt)
+    u2_xt = np.asarray(u2_xt)
+    yc_xt = np.asarray(yc_xt)
+    fig, axes = plt.subplots(4, 1, figsize=(10, 12), sharex=True, layout= 'constrained', gridspec_kw={'height_ratios': [2.5, 1, 1, 1]})
+    ax_field, ax_u1, ax_u2, ax_yc = axes
 
-mesh = ax_field.pcolormesh(x_grid/wake_params.D, y_grid/wake_params.D, frames[0], cmap='plasma',
-                    shading='auto', vmin=0, vmax=frames.max())
-fig.colorbar(mesh, ax=ax_field, location = 'top', shrink = 0.5, label = r'$u_1$ [m/s]')
-cl_line, = ax_field.plot(x_grid/wake_params.D, yc_xt[0]/wake_params.D, 'w--', lw=1.2, label = '$y_c$')
-ax_field.set_ylabel(r'$y/D$')
-ax_field.legend(loc='upper right')
+    #### Flow field
 
-### flow variable profiles
+    mesh = ax_field.pcolormesh(x_grid/wake_params.D, y_grid/wake_params.D, frames[0], cmap='plasma',
+                        shading='auto', vmin=0, vmax=frames.max())
+    fig.colorbar(mesh, ax=ax_field, location = 'top', shrink = 0.5, label = r'$u_1$ [m/s]')
+    cl_line, = ax_field.plot(x_grid/wake_params.D, yc_xt[0]/wake_params.D, 'w--', lw=1.2, label = '$y_c$')
+    ax_field.set_ylabel(r'$y/D$')
+    ax_field.legend(loc='upper right')
 
-u1_line, = ax_u1.plot(x_grid/wake_params.D, u1_xt[0], lw=1.2)
-ax_u1.set_ylim(u1_xt.min(), 1.1*u1_xt.max())
-ax_u1.set_ylabel(r'$u_1$ [m/s]')
+    ### flow variable profiles
 
-
-u2_line, = ax_u2.plot(x_grid/wake_params.D, u2_xt[0], lw=1.2)
-ax_u2.set_ylim(1.1*u2_xt.min(), 1.1*u2_xt.max())
-ax_u2.set_ylabel(r'$u_2$ [m/s]')
+    u1_line, = ax_u1.plot(x_grid/wake_params.D, u1_xt[0], lw=1.2)
+    ax_u1.set_ylim(u1_xt.min(), 1.1*u1_xt.max())
+    ax_u1.set_ylabel(r'$u_1$ [m/s]')
 
 
-yc_line, = ax_yc.plot(x_grid/wake_params.D, yc_xt[0], lw=1.2)
-ax_yc.set_ylim(1.1*yc_xt.min(), 1.1*yc_xt.max())
-ax_yc.set_ylabel(r'$y_c$ [m]')
-ax_yc.set_xlabel(r'$x/D$')
-
-timestamp = ax_field.text(0.02, 0.92, '', transform = ax_field.transAxes, color='w')
-
-def update(i):
-    mesh.set_array(frames[i].ravel())
-    cl_line.set_ydata(yc_xt[i]/wake_params.D)
-    u1_line.set_ydata(u1_xt[i])
-    u2_line.set_ydata(u2_xt[i])
-    yc_line.set_ydata(yc_xt[i])
-    timestamp.set_text(rf"$\gamma_0$ = {wake_params.gamma_deg:.1f}°, t = {ts[i]:.0f} s")
-    return mesh, cl_line, u1_line, u2_line, yc_line, timestamp
+    u2_line, = ax_u2.plot(x_grid/wake_params.D, u2_xt[0], lw=1.2)
+    ax_u2.set_ylim(1.1*u2_xt.min(), 1.1*u2_xt.max())
+    ax_u2.set_ylabel(r'$u_2$ [m/s]')
 
 
-ani = FuncAnimation(fig, update, frames=len(ts), interval=50, blit = True)
+    yc_line, = ax_yc.plot(x_grid/wake_params.D, yc_xt[0], lw=1.2)
+    ax_yc.set_ylim(1.1*yc_xt.min(), 1.1*yc_xt.max())
+    ax_yc.set_ylabel(r'$y_c$ [m]')
+    ax_yc.set_xlabel(r'$x/D$')
 
-save_video(ani,'two_turbine_superposition.mp4')
+    timestamp = ax_field.text(0.02, 0.92, '', transform = ax_field.transAxes, color='w')
+
+    def update(i):
+        mesh.set_array(frames[i].ravel())
+        cl_line.set_ydata(yc_xt[i]/wake_params.D)
+        u1_line.set_ydata(u1_xt[i])
+        u2_line.set_ydata(u2_xt[i])
+        yc_line.set_ydata(yc_xt[i])
+        timestamp.set_text(rf"$\gamma_0$ = {wake_params.gamma_deg:.1f}°, t = {ts[i]:.0f} s")
+        return mesh, cl_line, u1_line, u2_line, yc_line, timestamp
+
+
+    ani = FuncAnimation(fig, update, frames=len(ts), interval=50, blit = True)
+
+    save_video(ani,'two_turbine_superposition.mp4')
