@@ -68,19 +68,33 @@ expansion_x1 = expansion(x_grid, wake_params)
 expansion_x2 = expansion(x_grid-wake_params.D*5.0, wake_params)
 dx = x_grid[1] - x_grid[0]
 
-def rhs(t, state, args):
+def rhs1(t, state, args):
 
     u1, u2, yc = state
 
-    du1_dt = -wake_params.UINF * d_dx(u1, dx) - wake_params.UINF * expansion_x1 * u1 -wake_params.UINF * expansion_x2 * u1 + S1_1(t, wake_params)*G_x1 + S1_2(t, wake_params) * G_x2
-    du2_dt = -wake_params.UINF * d_dx(u2, dx) - wake_params.UINF * expansion_x1 * u2 + S2_1(t, wake_params)*G_x1 - wake_params.UINF * expansion_x2 * u2 + S2_2(t, wake_params)*G_x2
+    du1_dt = -wake_params.UINF * d_dx(u1, dx) - wake_params.UINF * expansion_x1 * u1 + S1_1(t, wake_params)*G_x1
+    du2_dt = -wake_params.UINF * d_dx(u2, dx) - wake_params.UINF * expansion_x1 * u2 + S2_1(t, wake_params)*G_x1
+    dyc_dt = -wake_params.UINF * d_dx(yc, dx) - u2
+    
+    return (du1_dt, du2_dt, dyc_dt)
+
+def rhs2(t, state, args):
+
+    u1, u2, yc = state
+
+    du1_dt = -wake_params.UINF * d_dx(u1, dx) -wake_params.UINF * expansion_x2 * u1 + S1_2(t, wake_params) * G_x2
+    du2_dt = -wake_params.UINF * d_dx(u2, dx) - wake_params.UINF * expansion_x2 * u2 + S2_2(t, wake_params)*G_x2
     dyc_dt = -wake_params.UINF * d_dx(yc, dx) - u2
     
     return (du1_dt, du2_dt, dyc_dt)
 
 y0 = (jnp.zeros(nx), jnp.zeros(nx), jnp.zeros(nx))
 
-u1_xt, u2_xt, yc_xt = solver(ts, y0, rhs).ys
+u1_xt1, u2_xt1, yc_xt1 = solver(ts, y0, rhs1).ys
+u1_xt2, u2_xt2, yc_xt2 = solver(ts, y0, rhs2).ys
+u1_xt = u1_xt1 + u1_xt2
+u2_xt = u2_xt1 + u2_xt2
+yc_xt = yc_xt1 + yc_xt2
 
 y_grid = jnp.linspace(-3*wake_params.D, 3*wake_params.D, 100)
 
@@ -136,4 +150,4 @@ def update(i):
 
 ani = FuncAnimation(fig, update, frames=len(ts), interval=50, blit = True)
 
-save_video(ani,'two_turbine_multi_forcing.mp4')
+save_video(ani,'two_turbine_superposition.mp4')
