@@ -3,6 +3,8 @@
 __author__ = "Ali Alebeedan"
 __date__ = "16/7/2026"
 
+import dataclasses
+
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -13,53 +15,15 @@ from wake_dynamics import G, u_point
 from video_utils import save_video
 
 
-gamma_amplitude_rad = jnp.radians(30)
-gamma_frequency = 0.01827665508523  # Frequency of the sinusoidal variation in Hz
+from wake_dynamics import gamma_t, expansion
 
-def sinusoidal_variation(t, x0, amplitude, frequency):
-    """
-    Function to output a sinusoidally time-varying quantity x about mean x = 0.
-    
-    Parameters:
-    t : float
-        Time variable/parameter.
-    x0 : float
-        Initial value.
-    amplitude : float
-        Amplitude of the variation.
-    frequency : float
-        Frequency of the variation in Hz.
-        
-    Returns:
-    float
-        Time-varying value.
-    """
-    offset = jnp.arcsin(x0 / amplitude) / (2 * jnp.pi * frequency)
-    return amplitude * jnp.sin(2 * jnp.pi * frequency * (t + offset))
+p_static = wake_params
 
-def gamma_t(t, gamma0):
-    """Time varying function of the yaw angle.
+p_dynamic = dataclasses.replace(wake_params, gamma_fn = gamma_t) 
 
-    Args:
-        t (Float): time variable
-        gamma0 (Float): initial yaw angle
-    """
-    
-    return sinusoidal_variation(t, gamma0, amplitude=gamma_amplitude_rad, frequency=gamma_frequency)
+from unsteady_flow_solver import S1_default, S2_default
 
-def S1_1(t,p):
-    return p.UINF*p.UINF*(1.0-jnp.sqrt(1-p.Ct*jnp.cos(gamma_t(t,p.gamma))))
-
-def S2_1(t,p):
-    return wake_params.UINF*( 1.0/4.0 * wake_params.Ct * jnp.cos(gamma_t(t,p.gamma))**2 * jnp.sin(gamma_t(t,p.gamma)))
-
-def S1_2(t,p):
-    return p.UINF*p.UINF*(1.0-jnp.sqrt(1-p.Ct*jnp.cos(p.gamma)))
-
-def S2_2(t,p):
-    return wake_params.UINF*( 1.0/4.0 * wake_params.Ct * jnp.cos(p.gamma)**2 * jnp.sin(p.gamma))
-
-from shapiro_unsteady import solver, d_dx, expansion, ts, nx, x as x_grid
+from shapiro_unsteady import solver, d_dx, ts, nx, x as x_grid
 
 
 G_x1 = G(x_grid, wake_params)
@@ -72,8 +36,8 @@ def rhs(t, state, args):
 
     u1, u2, yc = state
 
-    du1_dt = -wake_params.UINF * d_dx(u1, dx) - wake_params.UINF * expansion_x1 * u1 -wake_params.UINF * expansion_x2 * u1 + S1_1(t, wake_params)*G_x1 + S1_2(t, wake_params) * G_x2
-    du2_dt = -wake_params.UINF * d_dx(u2, dx) - wake_params.UINF * expansion_x1 * u2 + S2_1(t, wake_params)*G_x1 - wake_params.UINF * expansion_x2 * u2 + S2_2(t, wake_params)*G_x2
+    du1_dt = -wake_params.UINF * d_dx(u1, dx) - wake_params.UINF * expansion_x1 * u1 -wake_params.UINF * expansion_x2 * u1 + S1_default(t, p_dynamic)*G_x1 + S1_default(t, p_static) * G_x2
+    du2_dt = -wake_params.UINF * d_dx(u2, dx) - wake_params.UINF * expansion_x1 * u2 + S2_default(t, p_dynamic)*G_x1 - wake_params.UINF * expansion_x2 * u2 + S2_default(t, p_static)*G_x2
     dyc_dt = -wake_params.UINF * d_dx(yc, dx) - u2
     
     return (du1_dt, du2_dt, dyc_dt)

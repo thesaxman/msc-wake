@@ -81,3 +81,37 @@ def gaussian(x, yc, y, p: WakeParams):
 
 def u_point(x, yc, u1, y, p: WakeParams):
     return u1 * gaussian(x, yc, y, p)
+
+gamma_amplitude_rad = jnp.radians(30)
+gamma_frequency = 0.01827665508523  # Frequency of the sinusoidal variation in Hz
+
+def sinusoidal_variation(t, x0, amplitude, frequency):
+    """
+    Function to output a sinusoidally time-varying quantity x about mean x = 0.
+    
+    Parameters:
+    t : float
+        Time variable/parameter.
+    x0 : float
+        Initial value.
+    amplitude : float
+        Amplitude of the variation.
+    frequency : float
+        Frequency of the variation in Hz.
+        
+    Returns:
+    float
+        Time-varying value.
+    """
+    offset = jnp.arcsin(x0 / amplitude) / (2 * jnp.pi * frequency)
+    return amplitude * jnp.sin(2 * jnp.pi * frequency * (t + offset))
+
+def gamma_t(t, gamma0):
+    """Time varying function of the yaw angle.
+
+    Args:
+        t (Float): time variable
+        gamma0 (Float): initial yaw angle
+    """
+    
+    return sinusoidal_variation(t, gamma0, amplitude=gamma_amplitude_rad, frequency=gamma_frequency)

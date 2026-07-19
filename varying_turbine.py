@@ -55,6 +55,7 @@ def S1(t,p):
 def S2(t,p):
     return wake_params.UINF*( 1.0/4.0 * wake_params.Ct * jnp.cos(gamma_t(t,p.gamma))**2 * jnp.sin(gamma_t(t,p.gamma)))
 
+from unsteady_flow_solver import 
 
 from shapiro_unsteady import solver, d_dx, expansion, ts, x
 
