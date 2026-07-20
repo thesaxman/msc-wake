@@ -13,6 +13,7 @@ from model_params import wake_params
 from diffrax import diffeqsolve, Tsit5, ODETerm, SaveAt, PIDController
 
 from wake_dynamics import A, dA_dx, G, u_point, WakeParams, expansion
+import unsteady_flow_solver as flowsolve
 import shapiro_steady as ss
 from video_utils import save_video
 
@@ -25,13 +26,6 @@ nx = 800
 x = jnp.linspace(wake_params.upstream_bound, wake_params.boundary, nx)
 dx = x[1]-x[0]
 
-
-def delta_u1_0(p):
-    return p.UINF*(1.0-jnp.sqrt(1-p.Ct*cos_gamma**2))
-S1 = delta_u1_0(wake_params)*wake_params.UINF
-DELTA_U2_0 = wake_params.UINF*(1.0/4.0*wake_params.Ct*cos_gamma**2*sin_gamma)
-S2 = DELTA_U2_0*wake_params.UINF
-
 #solver options
 stepsize_controller = PIDController(rtol=1e-5, atol=1e-7, pcoeff=0.3, icoeff=0.3)
 t1 = wake_params.t1
@@ -39,17 +33,6 @@ nt = 1000
 ts = jnp.linspace(0, t1, nt)
 max_steps = 10000000
 
-def solver(ts, y0, rhs_func):
-    return diffeqsolve(ODETerm(rhs_func), Tsit5(),
-                        t0=0, t1=ts[-1], dt0=None, y0=y0,
-                        saveat=SaveAt(ts=ts),
-                        stepsize_controller=stepsize_controller,
-                        max_steps=max_steps)
-
-def d_dx(var, dx): 
-    """ First order upwind derivative (flow in +x); zero-gradient inflow BC at index 0. """
-    dvar_dx = (var - jnp.roll(var, 1))/dx
-    return dvar_dx.at[0].set(0.0)
 
 def make_rhs(p: WakeParams, x_grid):
     
@@ -85,8 +68,8 @@ if __name__ == "__main__":
 
     # making animation frames
     build_frame = jax.vmap(u_point, in_axes=(0,0,0,None, None), out_axes=1)
-    all_frames = jax.vmap(build_frame, in_axes=(None,0,0,None, None), out_axes=0)(x, yc_xt, u1_xt, y, wake_params)
-    assert all_frames.shape == (u1_xt.shape[0], y.size, x.size), all_frames.shape
+    all_frames = jax.vmap(build_frame, in_axes=(None,0,0,None, None), out_axes=0)(x_grid, yc_xt, u1_xt, y_grid, wp)
+    assert all_frames.shape == (u1_xt.shape[0], y_grid.size, x_grid.size), all_frames.shape
     import numpy as np
     frames = np.asarray(all_frames)
     u1_xt = np.asarray(u1_xt)
