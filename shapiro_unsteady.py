@@ -10,9 +10,8 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from model_params import wake_params as wp, solver_params as sp
-from diffrax import diffeqsolve, Tsit5, ODETerm, SaveAt, PIDController
 
-from wake_dynamics import A, dA_dx, G, u_point, WakeParams, expansion
+from wake_dynamics import u_point
 import unsteady_flow_solver as flowsolve
 import shapiro_steady as ss
 from video_utils import save_video
@@ -75,7 +74,6 @@ if __name__ == "__main__":
     def wake_profiles():
         
         x_norm = x_grid/wp.D
-        y_norm = y_grid/wp.D
         
         fig, axes = plt.subplots(3, 1, figsize=(10, 12), sharex=True, layout= 'constrained')
         ax_u1, ax_u2, ax_yc = axes
@@ -98,7 +96,7 @@ if __name__ == "__main__":
         ax_yc.set_ylabel(r'$y_c$ [m]')
         ax_yc.set_xlabel(r'$x/D$')
 
-        timestamp = ax_u1.set_title('')
+        timestamp = ax_u1.text(0.02, 0.9,'', transform=ax_u1.transAxes)
 
         def update(i):
             u1_line_unsteady.set_ydata(u1_xt[i])
@@ -163,4 +161,6 @@ if __name__ == "__main__":
 
         save_video(ani,'full_wake_evolution.mp4')
     
-    
+    #separate_wake_video()
+    #wake_profiles()
+    #full_wake()
