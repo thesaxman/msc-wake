@@ -57,16 +57,16 @@ class SolverParams(eqx.Module):
         return self.x_grid[1]-self.x_grid[0]
 
 def default_d_dt(wp: WakeParams, sp: SolverParams, x_offset: float = 0.0):
-    
+    # Single turbine wake field - Can also be used for superposition implementation
     G_x = G(sp.x_grid-x_offset, wp)
-    expansion_x = expansion(sp.x_grid, wp)
+    expansion_x = expansion(sp.x_grid-x_offset, wp)
     def rhs(t, state, args):
         
         u1, u2, yc = state
         du1_dt = -wp.UINF * d_dx(u1, sp.dx) - wp.UINF * expansion_x * u1 \
-            + S1_default(t, wp) * G_x
+            + sp.S1(t, wp) * G_x
         du2_dt = -wp.UINF * d_dx(u2, sp.dx) - wp.UINF * expansion_x * u2 \
-            + S2_default(t, wp) * G_x
+            + sp.S2(t, wp) * G_x
         
         dyc_dt = -wp.UINF * d_dx(yc, sp.dx) - u2 # u2 is coupled to the centerline deflection equation
         
