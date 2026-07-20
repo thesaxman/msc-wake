@@ -9,7 +9,7 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-from model_params import wake_params
+from model_params import wake_params as wp, solver_params as sp
 from diffrax import diffeqsolve, Tsit5, ODETerm, SaveAt, PIDController
 
 from wake_dynamics import A, dA_dx, G, u_point, WakeParams, expansion
@@ -17,54 +17,24 @@ import unsteady_flow_solver as flowsolve
 import shapiro_steady as ss
 from video_utils import save_video
 
-gamma_rad = jnp.radians(wake_params.gamma_deg)
-cos_gamma = jnp.cos(gamma_rad)
-sin_gamma = jnp.sin(gamma_rad)
-
-#defining the spatial grid
-nx = 800
-x = jnp.linspace(wake_params.upstream_bound, wake_params.boundary, nx)
-dx = x[1]-x[0]
-
-#solver options
-stepsize_controller = PIDController(rtol=1e-5, atol=1e-7, pcoeff=0.3, icoeff=0.3)
-t1 = wake_params.t1
-nt = 1000
-ts = jnp.linspace(0, t1, nt)
-max_steps = 10000000
-
-
-def make_rhs(p: WakeParams, x_grid):
-    
-    G_x = G(x_grid, p)
-    expansion_x = expansion(x_grid, p)
-    def rhs(t, state, args): # system of PDES for u1, u2, yc
-        
-        u1, u2, yc = state
-        
-        du1_dt = -p.UINF*d_dx(u1, dx) - p.UINF*expansion_x*u1 + S1*G_x
-        
-        du2_dt = -wake_params.UINF*d_dx(u2, dx) - wake_params.UINF*expansion_x*u2 + S2*G_x
-        
-        dyc_dt = -wake_params.UINF*d_dx(yc, dx) - u2 # u2 is coupled to the centerline deflection equation
-        
-        return (du1_dt, du2_dt, dyc_dt)
-    
-    return rhs
 
 if __name__ == "__main__":
 
-    y0 = (jnp.zeros(nx), jnp.zeros(nx), jnp.zeros(nx))
+    x_grid = sp.x_grid
 
-    u1_xt, u2_xt, yc_xt = solver(ts, y0, make_rhs(wake_params, x)).ys
+    y0 = (jnp.zeros(sp.nx), 
+          jnp.zeros(sp.nx), 
+          jnp.zeros(sp.nx))
+
+    u1_xt, u2_xt, yc_xt = flowsolve.solver(y0, flowsolve.default_d_dt(wp, sp), sp).ys
 
 
 
-    y = jnp.linspace(-3*wake_params.D, 3*wake_params.D, 100)
-    u1_x = jax.vmap(ss.solve_steady_u1(wake_params))(x)
-    u2_steady = ss.solve_steady_u2(wake_params)
-    u2_x = jax.vmap(u2_steady)(x)
-    yc_x = jax.vmap(ss.solve_steady_yc(wake_params, u2_steady))(x)
+    y_grid = jnp.linspace(-3*wp.D, 3*wp.D, 100)
+    u1_x = jax.vmap(ss.solve_steady_u1(wp))(x_grid)
+    u2_steady = ss.solve_steady_u2(wp)
+    u2_x = jax.vmap(u2_steady)(x_grid)
+    yc_x = jax.vmap(ss.solve_steady_yc(wp, u2_steady))(x_grid)
 
     # making animation frames
     build_frame = jax.vmap(u_point, in_axes=(0,0,0,None, None), out_axes=1)
@@ -76,73 +46,121 @@ if __name__ == "__main__":
     u2_xt = np.asarray(u2_xt)
     yc_xt = np.asarray(yc_xt)
 
-    def separate_wake_video(): # will fix later
+    def separate_wake_video():
         
-        raise NotImplementedError("rebuild artists")
+        x_norm = x_grid/wp.D
+        y_norm = y_grid/wp.D
         
         fig, ax = plt.subplots(figsize=(10, 4))
+        
+        mesh = ax.pcolormesh(x_norm, y_norm, frames[0], cmap = 'plasma', shading='auto', vmin = 0, vmax = frames.max())
+        fig.colorbar(mesh, ax = ax, location = 'right', label = r'$u_1$ [m/s]')
+        cl_line, = ax.plot(x_norm, yc_xt[0]/wp.D, 'w--', lw=1.2, label = 'Unsteady $y_c$')
+        ax.plot(x_grid/wp.D, yc_x/wp.D, 'r--', lw=1.0, label='Steady $y_c$')
+        ax.set_ylabel(r'$y/D$')
+        ax.legend(loc='upper right')
+        
+        timestamp = ax.text(0.02, 0.92, '', transform = ax.transAxes, color='w')
+        
+        def update(i):
+            mesh.set_array(frames[i].ravel())
+            cl_line.set_ydata(yc_xt[i]/wp.D)
+            timestamp.set_text(rf"$\gamma$ = {wp.gamma_deg:.1f}°, t = {sp.ts[i]:.0f} s")
+            return mesh, cl_line, timestamp
+        
+        ani = FuncAnimation(fig, update, frames=len(sp.ts), interval=50)
+        video_filename = 'wake_field_evolution.mp4'
+        save_video(ani,video_filename)
+    
+    def wake_profiles():
+        
+        x_norm = x_grid/wp.D
+        y_norm = y_grid/wp.D
+        
+        fig, axes = plt.subplots(3, 1, figsize=(10, 12), sharex=True, layout= 'constrained')
+        ax_u1, ax_u2, ax_yc = axes
+        
+        ### flow variable profiles
 
+        u1_line_unsteady, = ax_u1.plot(x_norm, u1_xt[0], lw=1.2)
+        ax_u1.plot(x_norm, u1_x, 'r--', lw=1.0)
+        ax_u1.set_ylim(min(u1_xt.min(), u1_x.min()), 1.1*max(u1_xt.max(), u1_x.max()))
+        ax_u1.set_ylabel(r'$u_1$ [m/s]')
+
+        u2_line_unsteady, = ax_u2.plot(x_norm, u2_xt[0], lw=1.2)
+        ax_u2.plot(x_norm, u2_x, 'r--', lw=1.2)
+        ax_u2.set_ylim(1.1*min(u2_xt.min(), u2_x.min()), 1.1*max(u2_xt.max(), u2_x.max()))
+        ax_u2.set_ylabel(r'$u_2$ [m/s]')
+
+        yc_line_unsteady, = ax_yc.plot(x_norm, yc_xt[0], lw=1.2)
+        ax_yc.plot(x_norm, yc_x, 'r--', lw=1.2, label='Steady solution')
+        ax_yc.set_ylim(1.1*min(yc_xt.min(), yc_x.min()), 1.1*max(yc_xt.max(), yc_x.max()))
+        ax_yc.set_ylabel(r'$y_c$ [m]')
+        ax_yc.set_xlabel(r'$x/D$')
+
+        timestamp = ax_u1.set_title('')
+
+        def update(i):
+            u1_line_unsteady.set_ydata(u1_xt[i])
+            u2_line_unsteady.set_ydata(u2_xt[i])
+            yc_line_unsteady.set_ydata(yc_xt[i])
+            timestamp.set_text(rf"$\gamma$ = {wp.gamma_deg:.1f}°, t = {sp.ts[i]:.0f} s")
+            return u1_line_unsteady, u2_line_unsteady, yc_line_unsteady, timestamp
+
+
+        ani = FuncAnimation(fig, update, frames=len(sp.ts), interval=50, blit = True)
+
+        save_video(ani,'wake_profiles_evolution.mp4')
+
+    def full_wake():
+        
+        fig, axes = plt.subplots(4, 1, figsize=(10, 12), sharex=True, layout= 'constrained', gridspec_kw={'height_ratios': [2.5, 1, 1, 1]})
+        ax_field, ax_u1, ax_u2, ax_yc = axes
+
+        #### Flow field
+
+        mesh = ax_field.pcolormesh(x_grid/wp.D, y_grid/wp.D, frames[0], cmap='plasma',
+                            shading='auto', vmin=0, vmax=frames.max())
+        fig.colorbar(mesh, ax=ax_field, location = 'top', shrink = 0.5, label = r'$u_1$ [m/s]')
+        cl_line, = ax_field.plot(x_grid/wp.D, yc_xt[0]/wp.D, 'w--', lw=1.2, label = 'Unsteady $y_c$')
+        ax_field.plot(x_grid/wp.D, yc_x/wp.D, 'r--', lw=1.0, label='Steady $y_c$')
+        ax_field.set_ylabel(r'$y/D$')
+        ax_field.legend(loc='upper right')
+
+        ### flow variable profiles
+
+        u1_line_unsteady, = ax_u1.plot(x_grid/wp.D, u1_xt[0], lw=1.2)
+        ax_u1.plot(x_grid/wp.D, u1_x, 'r--', lw=1.0)
+        ax_u1.set_ylim(min(u1_xt.min(), u1_x.min()), 1.1*max(u1_xt.max(), u1_x.max()))
+        ax_u1.set_ylabel(r'$u_1$ [m/s]')
+
+
+        u2_line_unsteady, = ax_u2.plot(x_grid/wp.D, u2_xt[0], lw=1.2)
+        ax_u2.plot(x_grid/wp.D, u2_x, 'r--', lw=1.2)
+        ax_u2.set_ylim(1.1*min(u2_xt.min(), u2_x.min()), 1.1*max(u2_xt.max(), u2_x.max()))
+        ax_u2.set_ylabel(r'$u_2$ [m/s]')
+
+
+        yc_line_unsteady, = ax_yc.plot(x_grid/wp.D, yc_xt[0], lw=1.2)
+        ax_yc.plot(x_grid/wp.D, yc_x, 'r--', lw=1.2, label='Steady solution')
+        ax_yc.set_ylim(1.1*min(yc_xt.min(), yc_x.min()), 1.1*max(yc_xt.max(), yc_x.max()))
+        ax_yc.set_ylabel(r'$y_c$ [m]')
+        ax_yc.set_xlabel(r'$x/D$')
+
+        timestamp = ax_field.text(0.02, 0.92, '', transform = ax_field.transAxes, color='w')
 
         def update(i):
             mesh.set_array(frames[i].ravel())
-            line.set_ydata(np.asarray(yc_xt[i])/wake_params.D)
-            ax.set_title(rf"$\gamma$ = {wake_params.gamma_deg:.1f}°, t = {ts[i]:.1f} s")
-            return mesh, line
-
-        ani = FuncAnimation(fig, update, frames=len(ts), interval=50)
-        #ani.save('wake_field_evolution.gif', writer='ffmpeg', dpi=200)
-
-        video_filename = 'wake_field_evolution.mp4'
-            
-        save_video(ani,video_filename)
+            cl_line.set_ydata(yc_xt[i]/wp.D)
+            u1_line_unsteady.set_ydata(u1_xt[i])
+            u2_line_unsteady.set_ydata(u2_xt[i])
+            yc_line_unsteady.set_ydata(yc_xt[i])
+            timestamp.set_text(rf"$\gamma$ = {wp.gamma_deg:.1f}°, t = {sp.ts[i]:.0f} s")
+            return mesh, cl_line, u1_line_unsteady, u2_line_unsteady, yc_line_unsteady, timestamp
 
 
-    fig, axes = plt.subplots(4, 1, figsize=(10, 12), sharex=True, layout= 'constrained', gridspec_kw={'height_ratios': [2.5, 1, 1, 1]})
-    ax_field, ax_u1, ax_u2, ax_yc = axes
+        ani = FuncAnimation(fig, update, frames=len(sp.ts), interval=50, blit = True)
 
-    #### Flow field
-
-    mesh = ax_field.pcolormesh(x/wake_params.D, y/wake_params.D, frames[0], cmap='plasma',
-                        shading='auto', vmin=0, vmax=frames.max())
-    fig.colorbar(mesh, ax=ax_field, location = 'top', shrink = 0.5, label = r'$u_1$ [m/s]')
-    cl_line, = ax_field.plot(x/wake_params.D, yc_xt[0]/wake_params.D, 'w--', lw=1.2, label = 'Unsteady $y_c$')
-    ax_field.plot(x/wake_params.D, yc_x/wake_params.D, 'r--', lw=1.0, label='Steady $y_c$')
-    ax_field.set_ylabel(r'$y/D$')
-    ax_field.legend(loc='upper right')
-
-    ### flow variable profiles
-
-    u1_line_unsteady, = ax_u1.plot(x/wake_params.D, u1_xt[0], lw=1.2)
-    ax_u1.plot(x/wake_params.D, u1_x, 'r--', lw=1.0)
-    ax_u1.set_ylim(min(u1_xt.min(), u1_x.min()), 1.1*max(u1_xt.max(), u1_x.max()))
-    ax_u1.set_ylabel(r'$u_1$ [m/s]')
-
-
-    u2_line_unsteady, = ax_u2.plot(x/wake_params.D, u2_xt[0], lw=1.2)
-    ax_u2.plot(x/wake_params.D, u2_x, 'r--', lw=1.2)
-    ax_u2.set_ylim(1.1*min(u2_xt.min(), u2_x.min()), 1.1*max(u2_xt.max(), u2_x.max()))
-    ax_u2.set_ylabel(r'$u_2$ [m/s]')
-
-
-    yc_line_unsteady, = ax_yc.plot(x/wake_params.D, yc_xt[0], lw=1.2)
-    ax_yc.plot(x/wake_params.D, yc_x, 'r--', lw=1.2, label='Steady solution')
-    ax_yc.set_ylim(1.1*min(yc_xt.min(), yc_x.min()), 1.1*max(yc_xt.max(), yc_x.max()))
-    ax_yc.set_ylabel(r'$y_c$ [m]')
-    ax_yc.set_xlabel(r'$x/D$')
-
-    timestamp = ax_field.text(0.02, 0.92, '', transform = ax_field.transAxes, color='w')
-
-    def update(i):
-        mesh.set_array(frames[i].ravel())
-        cl_line.set_ydata(yc_xt[i]/wake_params.D)
-        u1_line_unsteady.set_ydata(u1_xt[i])
-        u2_line_unsteady.set_ydata(u2_xt[i])
-        yc_line_unsteady.set_ydata(yc_xt[i])
-        timestamp.set_text(rf"$\gamma$ = {wake_params.gamma_deg:.1f}°, t = {ts[i]:.0f} s")
-        return mesh, cl_line, u1_line_unsteady, u2_line_unsteady, yc_line_unsteady, timestamp
-
-
-    ani = FuncAnimation(fig, update, frames=len(ts), interval=50, blit = True)
-
-    save_video(ani,'full_wake_evolution.mp4')
-    #plt.show()
+        save_video(ani,'full_wake_evolution.mp4')
+    
+    
