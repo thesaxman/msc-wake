@@ -1,4 +1,3 @@
-####### Still figuring this out... ########
 
 from collections.abc import Callable
 
@@ -10,14 +9,14 @@ from diffrax import diffeqsolve, ODETerm, Tsit5, SaveAt, PIDController
 from wake_dynamics import WakeParams, G, expansion
 
 def delta_u1_0(t, p: WakeParams):
-    gamma  = p.gamma_fn(t, p.gamma)
+    gamma  = p.gamma_at(t)
     return p.UINF*(1-jnp.sqrt(1-p.Ct*jnp.cos(gamma)**2))
 
 def S1_default(t, p: WakeParams):
     return p.UINF * delta_u1_0(t, p)
     
 def delta_u2_0(t, p: WakeParams):
-    gamma  = p.gamma_fn(t, p.gamma)
+    gamma  = p.gamma_at(t)
     return p.UINF*(0.25*p.Ct*jnp.cos(gamma)**2 * jnp.sin(gamma))
 
 def S2_default(t, p: WakeParams):

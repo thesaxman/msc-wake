@@ -9,7 +9,7 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-from model_params import wake_params
+from model_params import wake_params, solver_params
 from wake_dynamics import G, u_point
 
 from video_utils import save_video
@@ -22,8 +22,6 @@ p_static = wake_params
 p_dynamic = dataclasses.replace(wake_params, gamma_fn = gamma_t) 
 
 from unsteady_flow_solver import S1_default, S2_default
-
-from shapiro_unsteady import solver, d_dx, ts, nx, x as x_grid
 
 
 G_x1 = G(x_grid, wake_params)
