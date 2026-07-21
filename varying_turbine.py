@@ -32,6 +32,8 @@ if __name__ == "__main__":
 
     u1_xt, u2_xt, yc_xt = solver(y0, default_d_dt(wp_sinusoid, sp), sp).ys
     y_grid = jnp.linspace(-3*wp_sinusoid.D, 3*wp_sinusoid.D, 100)
+    u1_xt, u2_xt, yc_xt = solver(y0, default_d_dt(wp_sinusoid, sp), sp).ys
+    y_grid = jnp.linspace(-3*wp_sinusoid.D, 3*wp_sinusoid.D, 100)
     
     # making animation frames
     build_frame = jax.vmap(u_point, in_axes=(0,0,0,None, None), out_axes=1)
