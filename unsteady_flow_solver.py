@@ -6,7 +6,7 @@ import jax.numpy as jnp
 import equinox as eqx
 from diffrax import diffeqsolve, ODETerm, Tsit5, SaveAt, PIDController
 
-from wake_dynamics import WakeParams, G, expansion
+from wake_dynamics import WakeParams, G, expansion, Turbine
 
 def delta_u1_0(t, p: WakeParams):
     gamma  = p.gamma_at(t)
@@ -68,6 +68,37 @@ def default_d_dt(wp: WakeParams, sp: SolverParams, x_offset: float = 0.0):
             + sp.S2(t, wp) * G_x
         
         dyc_dt = -wp.UINF * d_dx(yc, sp.dx) - u2 # u2 is coupled to the centerline deflection equation
+        
+        return (du1_dt, du2_dt, dyc_dt)
+        
+    return rhs
+
+def multi_turbine_d_dt(turbines: list[Turbine], sp: SolverParams):
+    """Couple RHS: all turbines share one flow field,
+    their forcings and expansion effects superpose additively."""
+    
+    #precompute forcing spatial terms
+    G_xs            = [G(sp.x_grid-tb.x0, tb.wp)         for tb in turbines]
+    expansion_xs    = [expansion(sp.x_grid-tb.x0, tb.wp) for tb in turbines]
+    def rhs(t, state, args):
+        
+        u1, u2, yc = state
+        
+        #advection terms
+        adv_u1 = -turbines[0].wp.UINF * d_dx(u1, sp.dx)
+        adv_u2 = -turbines[0].wp.UINF * d_dx(u2, sp.dx)
+        adv_yc = -turbines[0].wp.UINF * d_dx(yc, sp.dx)
+        
+        #forcing terms
+        src_u1 = sum(-tb.wp.UINF * ex * u1 + sp.S1(t, tb.wp) * Gx
+                     for tb, ex, Gx in zip (turbines, expansion_xs, G_xs))
+        src_u2 = sum(-tb.wp.UINF * ex * u2 + sp.S2(t, tb.wp) * Gx
+                     for tb, ex, Gx in zip (turbines, expansion_xs, G_xs))
+        
+        
+        du1_dt = adv_u1 + src_u1
+        du2_dt = adv_u2 + src_u2
+        dyc_dt = adv_yc - u2 # u2 is coupled to the centerline deflection equation
         
         return (du1_dt, du2_dt, dyc_dt)
         

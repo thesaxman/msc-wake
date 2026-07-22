@@ -58,7 +58,10 @@ class WakeParams(eqx.Module):
         """Yaw angle (in radians) at time t, via the configured control law."""
         return self.gamma_fn(t, self.gamma)
 
-    
+class Turbine(eqx.Module):
+    wp: WakeParams
+    x0: float = eqx.field(static = True, default = 0.0)
+
 def dw(x, p: WakeParams):
     return wake_expansion(x, p.D, p.kw)
 
@@ -119,3 +122,4 @@ def sinusoid_gamma_t(t, gamma0, amp = MAX_YAW, freq = YAW_FREQUENCY):
     """
     
     return sinusoidal_variation_t(t, gamma0, amplitude=amp, frequency=freq)
+
