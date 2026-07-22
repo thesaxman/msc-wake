@@ -3,53 +3,41 @@
 __author__ = "Ali Alebeedan"
 __date__ = "16/7/2026"
 
-import dataclasses
+from functools import partial
 
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-from model_params import wake_params, solver_params
-from wake_dynamics import G, u_point
+from model_params import wake_params as wp, solver_params as sp
+from wake_dynamics import u_point, sinusoid_gamma_t
+from unsteady_flow_solver import default_d_dt, solver
 
 from video_utils import save_video
 
 
-from wake_dynamics import gamma_t, expansion
+from wake_dynamics import make_turbine
 
-p_static = wake_params
+mk = partial(make_turbine, wp)
 
-p_dynamic = dataclasses.replace(wake_params, gamma_fn = gamma_t) 
+turbines = [
+    mk(0.0),
+    mk(5.0, gamma_fn=sinusoid_gamma_t),
+    mk(10.0, gamma_deg=-15.0)
+]
 
-from unsteady_flow_solver import S1_default, S2_default
+y0 = (jnp.zeros(sp.nx), jnp.zeros(sp.nx), jnp.zeros(sp.nx))
 
-
-G_x1 = G(x_grid, wake_params)
-G_x2 = G(x_grid-wake_params.D*5.0, wake_params)
-expansion_x1 = expansion(x_grid, wake_params)
-expansion_x2 = expansion(x_grid-wake_params.D*5.0, wake_params)
-dx = x_grid[1] - x_grid[0]
-
-def rhs(t, state, args):
-
-    u1, u2, yc = state
-
-    du1_dt = -wake_params.UINF * d_dx(u1, dx) - wake_params.UINF * expansion_x1 * u1 -wake_params.UINF * expansion_x2 * u1 + S1_default(t, p_dynamic)*G_x1 + S1_default(t, p_static) * G_x2
-    du2_dt = -wake_params.UINF * d_dx(u2, dx) - wake_params.UINF * expansion_x1 * u2 + S2_default(t, p_dynamic)*G_x1 - wake_params.UINF * expansion_x2 * u2 + S2_default(t, p_static)*G_x2
-    dyc_dt = -wake_params.UINF * d_dx(yc, dx) - u2
-    
-    return (du1_dt, du2_dt, dyc_dt)
-
-y0 = (jnp.zeros(nx), jnp.zeros(nx), jnp.zeros(nx))
-
-u1_xt, u2_xt, yc_xt = solver(ts, y0, rhs).ys
+u1_xt, u2_xt, yc_xt = solver(y0=y0, rhs_func=default_d_dt(turbines, sp), sp=sp).ys
 
 if __name__ == "__main__":
-    y_grid = jnp.linspace(-3*wake_params.D, 3*wake_params.D, 100)
+    D = wp.D
+    x_grid = sp.x_grid
+    y_grid = jnp.linspace(-3.0*D, 3*D, 100)
 
     # making animation frames
     build_frame = jax.vmap(u_point, in_axes=(0,0,0,None, None), out_axes=1)
-    all_frames = jax.vmap(build_frame, in_axes=(None,0,0,None, None), out_axes=0)(x_grid, yc_xt, u1_xt, y_grid, wake_params)
+    all_frames = jax.vmap(build_frame, in_axes=(None,0,0,None, None), out_axes=0)(x_grid, yc_xt, u1_xt, y_grid, wp)
     assert all_frames.shape == (u1_xt.shape[0], y_grid.size, x_grid.size), all_frames.shape
     import numpy as np
     frames = np.asarray(all_frames)
@@ -69,26 +57,26 @@ if __name__ == "__main__":
 
     #### Flow field
 
-    mesh = ax_field.pcolormesh(x_grid/wake_params.D, y_grid/wake_params.D, frames[0], cmap='plasma',
+    mesh = ax_field.pcolormesh(x_grid/D, y_grid/D, frames[0], cmap='plasma',
                         shading='auto', vmin=0, vmax=frames.max())
     fig.colorbar(mesh, ax=ax_field, location = 'top', shrink = 0.5, label = r'$u_1$ [m/s]')
-    cl_line, = ax_field.plot(x_grid/wake_params.D, yc_xt[0]/wake_params.D, 'w--', lw=1.2, label = '$y_c$')
+    cl_line, = ax_field.plot(x_grid/D, yc_xt[0]/D, 'w--', lw=1.2, label = '$y_c$')
     ax_field.set_ylabel(r'$y/D$')
     ax_field.legend(loc='upper right')
 
     ### flow variable profiles
 
-    u1_line, = ax_u1.plot(x_grid/wake_params.D, u1_xt[0], lw=1.2)
+    u1_line, = ax_u1.plot(x_grid/D, u1_xt[0], lw=1.2)
     ax_u1.set_ylim(u1_xt.min(), 1.1*u1_xt.max())
     ax_u1.set_ylabel(r'$u_1$ [m/s]')
 
 
-    u2_line, = ax_u2.plot(x_grid/wake_params.D, u2_xt[0], lw=1.2)
+    u2_line, = ax_u2.plot(x_grid/D, u2_xt[0], lw=1.2)
     ax_u2.set_ylim(1.1*u2_xt.min(), 1.1*u2_xt.max())
     ax_u2.set_ylabel(r'$u_2$ [m/s]')
 
 
-    yc_line, = ax_yc.plot(x_grid/wake_params.D, yc_xt[0], lw=1.2)
+    yc_line, = ax_yc.plot(x_grid/D, yc_xt[0], lw=1.2)
     ax_yc.set_ylim(1.1*yc_xt.min(), 1.1*yc_xt.max())
     ax_yc.set_ylabel(r'$y_c$ [m]')
     ax_yc.set_xlabel(r'$x/D$')
@@ -97,14 +85,14 @@ if __name__ == "__main__":
 
     def update(i):
         mesh.set_array(frames[i].ravel())
-        cl_line.set_ydata(yc_xt[i]/wake_params.D)
+        cl_line.set_ydata(yc_xt[i]/D)
         u1_line.set_ydata(u1_xt[i])
         u2_line.set_ydata(u2_xt[i])
         yc_line.set_ydata(yc_xt[i])
-        timestamp.set_text(rf"$\gamma_0$ = {wake_params.gamma_deg:.1f}°, t = {ts[i]:.0f} s")
+        timestamp.set_text(rf"t = {sp.ts[i]:.0f} s")
         return mesh, cl_line, u1_line, u2_line, yc_line, timestamp
 
 
-    ani = FuncAnimation(fig, update, frames=len(ts), interval=50, blit = True)
+    ani = FuncAnimation(fig, update, frames=len(sp.ts), interval=50, blit = True)
 
-    save_video(ani,'two_turbine_multi_forcing.mp4')
+    save_video(ani,'three_turbine_mf.mp4')
