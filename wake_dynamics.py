@@ -1,4 +1,5 @@
 from collections.abc import Callable
+import dataclasses
 
 import jax
 import jax.numpy as jnp
@@ -61,6 +62,24 @@ class WakeParams(eqx.Module):
 class Turbine(eqx.Module):
     wp: WakeParams
     x0: float = eqx.field(static = True, default = 0.0)
+
+def make_turbine(base: WakeParams, x0_diams: float, *,
+                 gamma_deg=None, gamma_fn=None):
+    """Build a Turbine from a base WakeParams, overriding only what's given.
+
+    Args:
+        base:      the shared baseline WakeParams
+        x0_diams:  streamwise position in rotor diameters
+        gamma_deg: override base yaw angle (degrees), if given
+        gamma_fn:  override control law, if given
+    """
+    overrides = {}
+    if gamma_deg is not None:
+        overrides['gamma_deg'] = gamma_deg
+    if gamma_fn is not None:
+        overrides['gamma_fn'] = gamma_fn
+    wp = dataclasses.replace(base, **overrides) if overrides else base
+    return Turbine(wp=wp, x0=x0_diams * base.D)
 
 def dw(x, p: WakeParams):
     return wake_expansion(x, p.D, p.kw)
