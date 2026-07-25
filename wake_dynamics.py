@@ -1,4 +1,5 @@
 from collections.abc import Callable
+import dataclasses
 
 import jax
 import jax.numpy as jnp
@@ -32,6 +33,8 @@ class WakeParams(eqx.Module):
     boundary_diams: float = 20.0
     upstream_diams: float = -4.0
     gamma_fn: Callable = eqx.field(static = True, default = constant_gamma)
+    max_gamma_deg: float = 30.0
+    
     
     @property
     def sigma0(self):
@@ -56,7 +59,28 @@ class WakeParams(eqx.Module):
         """Yaw angle (in radians) at time t, via the configured control law."""
         return self.gamma_fn(t, self.gamma)
 
-    
+class Turbine(eqx.Module):
+    wp: WakeParams
+    x0: float = eqx.field(static = True, default = 0.0)
+
+def make_turbine(base: WakeParams, x0_diams: float, *,
+                 gamma_deg=None, gamma_fn=None):
+    """Build a Turbine from a base WakeParams, overriding only what's given.
+
+    Args:
+        base:      the shared baseline WakeParams
+        x0_diams:  streamwise position in rotor diameters
+        gamma_deg: override base yaw angle (degrees), if given
+        gamma_fn:  override control law, if given
+    """
+    overrides = {}
+    if gamma_deg is not None:
+        overrides['gamma_deg'] = gamma_deg
+    if gamma_fn is not None:
+        overrides['gamma_fn'] = gamma_fn
+    wp = dataclasses.replace(base, **overrides) if overrides else base
+    return Turbine(wp=wp, x0=x0_diams * base.D)
+
 def dw(x, p: WakeParams):
     return wake_expansion(x, p.D, p.kw)
 
@@ -82,10 +106,10 @@ def gaussian(x, yc, y, p: WakeParams):
 def u_point(x, yc, u1, y, p: WakeParams):
     return u1 * gaussian(x, yc, y, p)
 
-gamma_amplitude_rad = jnp.radians(30)
-gamma_frequency = 0.01827665508523  # Frequency of the sinusoidal variation in Hz
+MAX_YAW = float(jnp.radians(30)) # Max operating yaw taken as 30 degrees
+YAW_FREQUENCY = 8.333e-4  # NREL nominal yaw-rate normalised by full rotation for frequency
 
-def sinusoidal_variation(t, x0, amplitude, frequency):
+def sinusoidal_variation_t(t, x0, amplitude, frequency):
     """
     Function to output a sinusoidally time-varying quantity x about mean x = 0.
     
@@ -101,17 +125,20 @@ def sinusoidal_variation(t, x0, amplitude, frequency):
         
     Returns:
     float
-        Time-varying value.
+        Time-varying value resolved at t.
     """
     offset = jnp.arcsin(x0 / amplitude) / (2 * jnp.pi * frequency)
     return amplitude * jnp.sin(2 * jnp.pi * frequency * (t + offset))
 
-def gamma_t(t, gamma0):
-    """Time varying function of the yaw angle.
+def sinusoid_gamma_t(t, gamma0, amp = MAX_YAW, freq = YAW_FREQUENCY):
+    """Time varying sinusoidal function of the yaw angle.
 
     Args:
         t (Float): time variable
-        gamma0 (Float): initial yaw angle
+        gamma0 (Float): initial yaw angle (rad)
+        gamma_amp (float): yaw variation amplitude (rad)
+        gamma_freq (float): yaw variation frequency (Hz)
     """
     
-    return sinusoidal_variation(t, gamma0, amplitude=gamma_amplitude_rad, frequency=gamma_frequency)
+    return sinusoidal_variation_t(t, gamma0, amplitude=amp, frequency=freq)
+
