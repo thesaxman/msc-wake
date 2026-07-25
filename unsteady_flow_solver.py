@@ -107,7 +107,7 @@ def advecting_d_dt(turbines: list[Turbine], sp: SolverParams):
         #forcing terms
         src_u1 = sum(-(tb.wp.UINF -u1) * ex * u1 + sp.S1(t, tb.wp) * Gx
                      for tb, ex, Gx in zip (turbines, expansion_xs, G_xs))
-        src_u2 = sum(-(tb.wp.UINF - u1) * (1-u1/tb.wp.UINF) * ex * u2 + sp.S2(t, tb.wp) * Gx
+        src_u2 = sum(-(tb.wp.UINF - u1) * ex * u2 + sp.S2(t, tb.wp) * Gx
                      for tb, ex, Gx in zip (turbines, expansion_xs, G_xs))
         
         
