@@ -228,3 +228,10 @@ __marimo__/
 steady_state_debug.py
 outputs/
 .claude
+
+# Visual Studio Code
+.vscode/*
+*.code-workspace
+
+# Built Visual Studio Code Extensions
+*.vsix
