@@ -94,15 +94,16 @@ def advecting_d_dt(turbines: list[Turbine], sp: SolverParams):
     #precompute forcing spatial terms
     G_xs            = [G(sp.x_grid-tb.x0, tb.wp)         for tb in turbines]
     expansion_xs    = [expansion(sp.x_grid-tb.x0, tb.wp) for tb in turbines]
+    UINF = turbines[0].wp.UINF
     def rhs(t, state, args):
         
         u1, u2, yc = state
         
         
         #advection terms
-        adv_u1 = -(turbines[0].wp.UINF - u1) * d_dx(u1, sp.dx)
-        adv_u2 = -(turbines[0].wp.UINF - u1) * d_dx(u2, sp.dx)
-        adv_yc = -(turbines[0].wp.UINF - u1) * d_dx(yc, sp.dx)
+        adv_u1 = -(UINF - u1) * d_dx_upwind(u1, (UINF - u1), sp.dx)
+        adv_u2 = -(UINF - u1) * d_dx_upwind(u2, (UINF - u1), sp.dx)
+        adv_yc = -(UINF - u1) * d_dx_upwind(yc, (UINF - u1), sp.dx)
         
         #forcing terms
         src_u1 = sum(-(tb.wp.UINF -u1) * ex * u1 + sp.S1(t, tb.wp) * Gx
