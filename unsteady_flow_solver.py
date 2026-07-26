@@ -27,6 +27,13 @@ def d_dx(var, dx):
     dvar_dx = (var - jnp.roll(var, 1))/dx
     return dvar_dx.at[0].set(0.0)
 
+def d_dx_upwind(var, speed, dx):
+    back = (var - jnp.roll(var, 1)) / dx # when speed > 0
+    fwd = (jnp.roll(var, -1) - var) / dx # when speed < 0
+    d = jnp.where(speed > 0, back, fwd)
+    return d.at[0].set(0.0)
+    
+
 
 class SolverParams(eqx.Module):
     
