@@ -63,7 +63,7 @@ def solve_steady_yc(p: wp, u2 = None):
 if __name__ == "__main__":
 
     #Flow field can be first evaluated along x
-    x = jnp.linspace(0.0, wake_params.boundary, 100)
+    x = jnp.linspace(1.0*wake_params.D, 12.0*wake_params.D, 100)
     y = jnp.linspace(-1.1*wake_params.D, 1.1*wake_params.D, 100)
     u1_x = jax.vmap(solve_steady_u1(wake_params))(x)
     u2 = solve_steady_u2(wake_params)
@@ -74,6 +74,8 @@ if __name__ == "__main__":
     from wake_dynamics import u_point, dw
     
     u1_field = jax.vmap(u_point, in_axes=(0,0,0,None,None), out_axes=1)(x, yc_x, u1_x, y, wake_params)
+    
+    print(f'max u/U∞ = {float(u1_field.max()/wake_params.UINF):.2f}')
     
     # closed form solution for comparison
     
