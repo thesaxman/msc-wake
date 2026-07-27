@@ -9,7 +9,7 @@ import dataclasses
 import jax.numpy as jnp
 from model_params import wake_params as wp, solver_params as sp
 from wake_dynamics import make_turbine
-from unsteady_flow_solver import advecting_d_dt, solver
+from unsteady_flow_solver import advecting_d_dt, solver, adv_S1, adv_S2
 
 from video_utils import WakeSeries, with_field, yaw_label_fn, full_video
 
@@ -20,7 +20,7 @@ turbines = [
     mk(0.0, gamma_deg = -15.0)
 ]
 
-sp = dataclasses.replace(sp, max_steps  = 10_000_000)
+sp = dataclasses.replace(sp, max_steps  = 10_000_000, S1 = adv_S1, S2 = adv_S2)
 
 y0 = (jnp.zeros(sp.nx), jnp.zeros(sp.nx), jnp.zeros(sp.nx))
 
