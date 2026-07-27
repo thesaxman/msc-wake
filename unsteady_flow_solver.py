@@ -77,9 +77,9 @@ def default_d_dt(turbines: list[Turbine], sp: SolverParams):
         adv_yc = -turbines[0].wp.UINF * d_dx(yc, sp.dx)
         
         #forcing terms
-        src_u1 = sum(-tb.wp.UINF * ex * u1 + sp.S1(t, tb.wp) * Gx
+        src_u1 = sum(-tb.wp.UINF * ex * u1 + sp.S1(t, u1, tb.wp) * Gx
                      for tb, ex, Gx in zip (turbines, expansion_xs, G_xs))
-        src_u2 = sum(-tb.wp.UINF * ex * u2 + sp.S2(t, tb.wp) * Gx
+        src_u2 = sum(-tb.wp.UINF * ex * u2 + sp.S2(t, u1, tb.wp) * Gx
                      for tb, ex, Gx in zip (turbines, expansion_xs, G_xs))
         
         
@@ -116,9 +116,9 @@ def advecting_d_dt(turbines: list[Turbine], sp: SolverParams):
         adv_yc = -(UINF - u1) * d_dx_upwind(yc, (UINF - u1), sp.dx)
         
         #forcing terms
-        src_u1 = sum(-(tb.wp.UINF -u1) * ex * u1 + sp.S1(t, tb.wp) * Gx
+        src_u1 = sum(-(tb.wp.UINF -u1) * ex * u1 + sp.S1(t, u1, tb.wp) * Gx
                      for tb, ex, Gx in zip (turbines, expansion_xs, G_xs))
-        src_u2 = sum(-(tb.wp.UINF - u1) * ex * u2 + sp.S2(t, tb.wp) * Gx
+        src_u2 = sum(-(tb.wp.UINF - u1) * ex * u2 + sp.S2(t, u1, tb.wp) * Gx
                      for tb, ex, Gx in zip (turbines, expansion_xs, G_xs))
         
         
