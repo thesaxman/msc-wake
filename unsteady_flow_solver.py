@@ -12,14 +12,14 @@ def delta_u1_0(t, p: WakeParams):
     gamma  = p.gamma_at(t)
     return p.UINF*(1-jnp.sqrt(1-p.Ct*jnp.cos(gamma)**2))
 
-def S1_default(t, p: WakeParams):
+def S1_default(t, u1, p: WakeParams):
     return p.UINF * delta_u1_0(t, p)
     
 def delta_u2_0(t, p: WakeParams):
     gamma  = p.gamma_at(t)
     return p.UINF*(0.25*p.Ct*jnp.cos(gamma)**2 * jnp.sin(gamma))
 
-def S2_default(t, p: WakeParams):
+def S2_default(t, u2, p: WakeParams):
     return p.UINF * delta_u2_0(t, p)
 
 def d_dx(var, dx): 
@@ -32,8 +32,6 @@ def d_dx_upwind(var, speed, dx):
     fwd = (jnp.roll(var, -1) - var) / dx # when speed < 0
     d = jnp.where(speed > 0, back, fwd)
     return d.at[0].set(0.0)
-    
-
 
 class SolverParams(eqx.Module):
     
@@ -61,7 +59,6 @@ class SolverParams(eqx.Module):
     @property
     def dx(self):
         return self.x_grid[1]-self.x_grid[0]
-
 
 def default_d_dt(turbines: list[Turbine], sp: SolverParams):
     """Couple RHS: all turbines share one flow field,
@@ -93,6 +90,12 @@ def default_d_dt(turbines: list[Turbine], sp: SolverParams):
         return (du1_dt, du2_dt, dyc_dt)
         
     return rhs
+
+def adv_S1(t, u1, wp: WakeParams):
+    return (wp.UINF - u1) * delta_u1_0(t, wp)
+
+def adv_S2(t, u1, wp: WakeParams):
+    return (wp.UINF - u1) * delta_u2_0(t, wp)
 
 def advecting_d_dt(turbines: list[Turbine], sp: SolverParams):
     """Couple RHS: all turbines share one flow field,
