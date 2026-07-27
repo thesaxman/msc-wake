@@ -10,6 +10,6 @@ wake_params = WakeParams(
     D = 0.15, 
     kw = 0.0834, 
     Ct=0.8, 
-    gamma_deg = 0, 
+    gamma_deg = -20, 
     UINF=4.88)
 solver_params = SolverParams(wp= wake_params)
