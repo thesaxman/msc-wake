@@ -27,6 +27,13 @@ def d_dx(var, dx):
     dvar_dx = (var - jnp.roll(var, 1))/dx
     return dvar_dx.at[0].set(0.0)
 
+def d_dx_upwind(var, speed, dx):
+    back = (var - jnp.roll(var, 1)) / dx # when speed > 0
+    fwd = (jnp.roll(var, -1) - var) / dx # when speed < 0
+    d = jnp.where(speed > 0, back, fwd)
+    return d.at[0].set(0.0)
+    
+
 
 class SolverParams(eqx.Module):
     
@@ -94,20 +101,21 @@ def advecting_d_dt(turbines: list[Turbine], sp: SolverParams):
     #precompute forcing spatial terms
     G_xs            = [G(sp.x_grid-tb.x0, tb.wp)         for tb in turbines]
     expansion_xs    = [expansion(sp.x_grid-tb.x0, tb.wp) for tb in turbines]
+    UINF = turbines[0].wp.UINF
     def rhs(t, state, args):
         
         u1, u2, yc = state
         
         
         #advection terms
-        adv_u1 = -(turbines[0].wp.UINF - u1) * d_dx(u1, sp.dx)
-        adv_u2 = -(turbines[0].wp.UINF - u1) * d_dx(u2, sp.dx)
-        adv_yc = -(turbines[0].wp.UINF - u1) * d_dx(yc, sp.dx)
+        adv_u1 = -(UINF - u1) * d_dx_upwind(u1, (UINF - u1), sp.dx)
+        adv_u2 = -(UINF - u1) * d_dx_upwind(u2, (UINF - u1), sp.dx)
+        adv_yc = -(UINF - u1) * d_dx_upwind(yc, (UINF - u1), sp.dx)
         
         #forcing terms
         src_u1 = sum(-(tb.wp.UINF -u1) * ex * u1 + sp.S1(t, tb.wp) * Gx
                      for tb, ex, Gx in zip (turbines, expansion_xs, G_xs))
-        src_u2 = sum(-(tb.wp.UINF - u1) * (1-u1/tb.wp.UINF) * ex * u2 + sp.S2(t, tb.wp) * Gx
+        src_u2 = sum(-(tb.wp.UINF - u1) * ex * u2 + sp.S2(t, tb.wp) * Gx
                      for tb, ex, Gx in zip (turbines, expansion_xs, G_xs))
         
         

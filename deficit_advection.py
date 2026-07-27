@@ -1,13 +1,14 @@
-""" A simple approach to visualising effect of n turbines in a single column"""
+""" This approach to implementing an advection velocity that takes into account the deficit rather than purely free-stream"""
 
 __author__ = "Ali Alebeedan"
-__date__ = "16/7/2026"
+__date__ = "25/7/2026"
 
 from functools import partial
+import dataclasses
 
 import jax.numpy as jnp
 from model_params import wake_params as wp, solver_params as sp
-from wake_dynamics import sinusoid_gamma_t, make_turbine
+from wake_dynamics import make_turbine
 from unsteady_flow_solver import advecting_d_dt, solver
 
 from video_utils import WakeSeries, with_field, yaw_label_fn, full_video
@@ -16,13 +17,16 @@ from video_utils import WakeSeries, with_field, yaw_label_fn, full_video
 mk = partial(make_turbine, wp)
 
 turbines = [
-    mk(0.0, gamma_deg = -15.0),
-    mk(5.0, gamma_fn=sinusoid_gamma_t)
+    mk(0.0, gamma_deg = -15.0)
 ]
+
+sp = dataclasses.replace(sp, max_steps  = 10_000_000)
 
 y0 = (jnp.zeros(sp.nx), jnp.zeros(sp.nx), jnp.zeros(sp.nx))
 
 u1_xt, u2_xt, yc_xt = solver(y0=y0, rhs_func=advecting_d_dt(turbines, sp), sp=sp).ys
+
+print(float((wp.UINF - u1_xt).min()))
 
 if __name__ == "__main__":
     D = wp.D
@@ -34,5 +38,7 @@ if __name__ == "__main__":
                    label_fn=yaw_label_fn([tb.wp for tb in turbines], sp.ts)),
         y_grid,
     )
-
-    full_video(series, 'three_turbine_mf.mp4')
+    g = turbines[0].wp.gamma_deg
+    sign = "neg" if g < 0 else "pos"
+    g = f"{g:.1f}".replace('.', 'p')
+    full_video(series, f'advecting_deficit_gamma_{sign}{g}.mp4')
