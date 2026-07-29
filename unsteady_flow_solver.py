@@ -131,5 +131,5 @@ def solver(y0, rhs_func, sp: SolverParams):
     return diffeqsolve(ODETerm(rhs_func), Tsit5(),
                         t0=0, t1=sp.ts[-1], dt0=None, y0=y0,
                         saveat=SaveAt(ts=sp.ts),
-                        stepsize_controller=PIDController(rtol=sp.rtol,atol=sp.atol),
+                        stepsize_controller=PIDController(rtol=sp.rtol,atol=sp.atol, pcoeff=sp.pcoeff, icoeff=sp.icoeff),
                         max_steps=sp.max_steps)
