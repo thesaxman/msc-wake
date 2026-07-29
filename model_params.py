@@ -1,5 +1,5 @@
 """
-The following script is organises the model parameters used for calculating the
+The following script organises the model parameters used for calculating the
 flow field. The parameters are collected as wake dynamics parameters and solver scheme parameters.
 """
 
