@@ -17,7 +17,7 @@ from video_utils import WakeSeries, with_field, yaw_label_fn, full_video
 mk = partial(make_turbine, wp)
 
 turbines = [
-    mk(0.0, gamma_deg = -15.0)
+    mk(0.0, gamma_deg = 0.0)
 ]
 
 sp = dataclasses.replace(sp, max_steps  = 10_000_000, S1 = adv_S1, S2 = adv_S2)
