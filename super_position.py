@@ -11,8 +11,8 @@ from unsteady_flow_solver import default_d_dt, solver
 from video_utils import WakeSeries, with_field, yaw_label_fn, full_video
 
 
-turbine1 = make_turbine(wake_params, 0.0, gamma_fn=sinusoid_gamma_t)  # dynamic yaw, upstream
-turbine2 = make_turbine(wake_params, 5.0)                              # static baseline, downstream
+turbine1 = make_turbine(wake_params, 0.0, gamma_deg=-15.0) # dynamic yaw, upstream
+turbine2 = make_turbine(wake_params, 5.0, gamma_fn=sinusoid_gamma_t) # static baseline, downstream
 
 y0 = (jnp.zeros(sp.nx), jnp.zeros(sp.nx), jnp.zeros(sp.nx))
 
