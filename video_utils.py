@@ -191,20 +191,21 @@ def _draw_field(ax, fig, series: WakeSeries, *, diff: bool, percent: bool,
 def _draw_profiles(ax_u1, ax_u2, ax_yc, series: WakeSeries, *, diff: bool,
                     steady: Optional[SteadyRef], percent: bool):
     x_norm = series.x_grid / series.wp.D
+    yc_scale = 1.0 if diff else 100.0  # yc_xt is stored in metres; display in cm
 
     u1_line, = ax_u1.plot(x_norm, series.u1_xt[0], lw=1.2)
     u2_line, = ax_u2.plot(x_norm, series.u2_xt[0], lw=1.2)
-    yc_line, = ax_yc.plot(x_norm, series.yc_xt[0], lw=1.2, label='Unsteady' if steady is not None else None)
+    yc_line, = ax_yc.plot(x_norm, series.yc_xt[0] * yc_scale, lw=1.2, label='Unsteady' if steady is not None else None)
 
-    u1_refs, u2_refs, yc_refs = [series.u1_xt], [series.u2_xt], [series.yc_xt]
+    u1_refs, u2_refs, yc_refs = [series.u1_xt], [series.u2_xt], [series.yc_xt * yc_scale]
     if steady is not None:
         ax_u1.plot(x_norm, steady.u1_x, 'r--', lw=1.0)
         ax_u2.plot(x_norm, steady.u2_x, 'r--', lw=1.0)
-        ax_yc.plot(x_norm, steady.yc_x, 'r--', lw=1.0, label=steady.label)
+        ax_yc.plot(x_norm, steady.yc_x * yc_scale, 'r--', lw=1.0, label=steady.label)
         ax_yc.legend()
         u1_refs.append(steady.u1_x)
         u2_refs.append(steady.u2_x)
-        yc_refs.append(steady.yc_x)
+        yc_refs.append(steady.yc_x * yc_scale)
 
     _pad_ylim(ax_u1, *u1_refs, diff=diff)
     _pad_ylim(ax_u2, *u2_refs, diff=diff)
@@ -212,14 +213,14 @@ def _draw_profiles(ax_u1, ax_u2, ax_yc, series: WakeSeries, *, diff: bool,
 
     ax_u1.set_ylabel(r'$\Delta u_1$' if diff else r'$u_1$ [m/s]')
     ax_u2.set_ylabel(r'$\Delta u_2$' if diff else r'$u_2$ [m/s]')
-    ax_yc.set_ylabel(r'$\Delta y_c$' if diff else r'$y_c$ [m]')
+    ax_yc.set_ylabel(r'$\Delta y_c$' if diff else r'$y_c$ [cm]')
     ax_yc.set_xlabel(r'$x/D$')
 
     if percent:
         for ax in (ax_u1, ax_u2, ax_yc):
             ax.yaxis.set_major_formatter(PercentFormatter(xmax=1.0))
 
-    return u1_line, u2_line, yc_line
+    return u1_line, u2_line, yc_line, yc_scale
 
 
 def field_video(series: WakeSeries, filename: str, *, steady: Optional[SteadyRef] = None,
@@ -252,8 +253,8 @@ def profiles_video(series: WakeSeries, filename: str, *, steady: Optional[Steady
     """Animate the three flow-variable profiles (u1, u2, yc) stacked vertically."""
     fig, axes = plt.subplots(3, 1, figsize=figsize, sharex=True, layout='constrained')
     ax_u1, ax_u2, ax_yc = axes
-    u1_line, u2_line, yc_line = _draw_profiles(ax_u1, ax_u2, ax_yc, series,
-                                                diff=diff, steady=steady, percent=percent)
+    u1_line, u2_line, yc_line, yc_scale = _draw_profiles(ax_u1, ax_u2, ax_yc, series,
+                                                          diff=diff, steady=steady, percent=percent)
     if gridlines:
         _add_gridlines(axes)
 
@@ -262,7 +263,7 @@ def profiles_video(series: WakeSeries, filename: str, *, steady: Optional[Steady
     def update(i):
         u1_line.set_ydata(series.u1_xt[i])
         u2_line.set_ydata(series.u2_xt[i])
-        yc_line.set_ydata(series.yc_xt[i])
+        yc_line.set_ydata(series.yc_xt[i] * yc_scale)
         timestamp.set_text(_label(series, i))
         return u1_line, u2_line, yc_line, timestamp
 
@@ -284,8 +285,8 @@ def full_video(series: WakeSeries, filename: str, *, steady: Optional[SteadyRef]
 
     mesh, cl_line, timestamp = _draw_field(ax_field, fig, series, diff=diff, percent=percent, steady=steady,
                                             colorbar_loc='top', colorbar_shrink=0.5)
-    u1_line, u2_line, yc_line = _draw_profiles(ax_u1, ax_u2, ax_yc, series,
-                                                diff=diff, steady=steady, percent=percent)
+    u1_line, u2_line, yc_line, yc_scale = _draw_profiles(ax_u1, ax_u2, ax_yc, series,
+                                                          diff=diff, steady=steady, percent=percent)
     if gridlines:
         _add_gridlines(axes)
 
@@ -294,7 +295,7 @@ def full_video(series: WakeSeries, filename: str, *, steady: Optional[SteadyRef]
         cl_line.set_ydata(series.yc_xt[i] / series.wp.D)
         u1_line.set_ydata(series.u1_xt[i])
         u2_line.set_ydata(series.u2_xt[i])
-        yc_line.set_ydata(series.yc_xt[i])
+        yc_line.set_ydata(series.yc_xt[i] * yc_scale)
         timestamp.set_text(_label(series, i))
         return mesh, cl_line, u1_line, u2_line, yc_line, timestamp
 
