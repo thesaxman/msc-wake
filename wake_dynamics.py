@@ -34,6 +34,7 @@ class WakeParams(eqx.Module):
     upstream_diams: float = -4.0
     gamma_fn: Callable = eqx.field(static = True, default = constant_gamma)
     max_gamma_deg: float = 30.0
+    calibration: str = eqx.field(static=True, default="bastankhah-2016")
     
     
     @property
