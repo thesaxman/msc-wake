@@ -127,7 +127,7 @@ def yaw_label_fn(params, ts) -> Callable[[int], str]:
         yaws = [float(jnp.degrees(p.gamma_at(t))) for p in params]
         if len(yaws) == 1:
             return rf"$\gamma$ = {yaws[0]:.1f}°, t = {t:.0f} s"
-        yaw_str = ", ".join(rf"$\gamma_{{{j}}}$={y:.1f}°" for j, y in enumerate(yaws))
+        yaw_str = ", ".join(rf"$\gamma_{{{j+1}}}$={y:.1f}°" for j, y in enumerate(yaws))
         return rf"{yaw_str}, t = {t:.0f} s"
     return label
 
@@ -189,9 +189,9 @@ def _draw_field(ax, fig, series: WakeSeries, *, diff: bool, percent: bool,
 
 
 def _draw_profiles(ax_u1, ax_u2, ax_yc, series: WakeSeries, *, diff: bool,
-                    steady: Optional[SteadyRef], percent: bool):
+                    steady: Optional[SteadyRef], percent: bool, yc_cm: bool = True):
     x_norm = series.x_grid / series.wp.D
-    yc_scale = 1.0 if diff else 100.0  # yc_xt is stored in metres; display in cm
+    yc_scale = 1.0 if diff else (100.0 if yc_cm else 1.0)  # yc_xt is stored in metres
 
     u1_line, = ax_u1.plot(x_norm, series.u1_xt[0], lw=1.2)
     u2_line, = ax_u2.plot(x_norm, series.u2_xt[0], lw=1.2)
@@ -213,7 +213,7 @@ def _draw_profiles(ax_u1, ax_u2, ax_yc, series: WakeSeries, *, diff: bool,
 
     ax_u1.set_ylabel(r'$\Delta u_1$' if diff else r'$u_1$ [m/s]')
     ax_u2.set_ylabel(r'$\Delta u_2$' if diff else r'$u_2$ [m/s]')
-    ax_yc.set_ylabel(r'$\Delta y_c$' if diff else r'$y_c$ [cm]')
+    ax_yc.set_ylabel(r'$\Delta y_c$' if diff else (r'$y_c$ [cm]' if yc_cm else r'$y_c$ [m]'))
     ax_yc.set_xlabel(r'$x/D$')
 
     if percent:
@@ -249,12 +249,16 @@ def field_video(series: WakeSeries, filename: str, *, steady: Optional[SteadyRef
 
 def profiles_video(series: WakeSeries, filename: str, *, steady: Optional[SteadyRef] = None,
                     diff: bool = False, percent: bool = False, gridlines: bool = True,
-                    figsize=(10, 12), **save_kwargs):
-    """Animate the three flow-variable profiles (u1, u2, yc) stacked vertically."""
+                    yc_cm: bool = True, figsize=(10, 12), **save_kwargs):
+    """Animate the three flow-variable profiles (u1, u2, yc) stacked vertically.
+
+    yc_cm: display yc in cm (default) or metres if False.
+    """
     fig, axes = plt.subplots(3, 1, figsize=figsize, sharex=True, layout='constrained')
     ax_u1, ax_u2, ax_yc = axes
     u1_line, u2_line, yc_line, yc_scale = _draw_profiles(ax_u1, ax_u2, ax_yc, series,
-                                                          diff=diff, steady=steady, percent=percent)
+                                                          diff=diff, steady=steady, percent=percent,
+                                                          yc_cm=yc_cm)
     if gridlines:
         _add_gridlines(axes)
 
@@ -274,8 +278,11 @@ def profiles_video(series: WakeSeries, filename: str, *, steady: Optional[Steady
 
 def full_video(series: WakeSeries, filename: str, *, steady: Optional[SteadyRef] = None,
                diff: bool = False, percent: bool = False, gridlines: bool = True,
-               figsize=(10, 12), **save_kwargs):
-    """Animate the flow field and all three variable profiles together."""
+               yc_cm: bool = True, figsize=(10, 12), **save_kwargs):
+    """Animate the flow field and all three variable profiles together.
+
+    yc_cm: display yc profile in cm (default) or metres if False.
+    """
     assert series.frames is not None and series.y_grid is not None, \
         "series has no field frames -- build one with with_field(series, y_grid) first"
 
@@ -286,7 +293,8 @@ def full_video(series: WakeSeries, filename: str, *, steady: Optional[SteadyRef]
     mesh, cl_line, timestamp = _draw_field(ax_field, fig, series, diff=diff, percent=percent, steady=steady,
                                             colorbar_loc='top', colorbar_shrink=0.5)
     u1_line, u2_line, yc_line, yc_scale = _draw_profiles(ax_u1, ax_u2, ax_yc, series,
-                                                          diff=diff, steady=steady, percent=percent)
+                                                          diff=diff, steady=steady, percent=percent,
+                                                          yc_cm=yc_cm)
     if gridlines:
         _add_gridlines(axes)
 
