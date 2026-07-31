@@ -35,4 +35,4 @@ if __name__ == "__main__":
         y_grid,
     )
 
-    full_video(series, 'three_turbine_mf.mp4')
+    full_video(series, 'two_turbine_mf.mp4')

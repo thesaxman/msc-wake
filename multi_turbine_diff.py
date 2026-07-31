@@ -8,6 +8,7 @@ from unsteady_flow_solver import delta_u1_0, delta_u2_0
 from video_utils import WakeSeries, with_field, yaw_label_fn, diff_series, full_video
 from multi_forcing import u1_xt as u1_mf, u2_xt as u2_mf, yc_xt as yc_mf
 from super_position import u1_xt as u1_sp, u2_xt as u2_sp, yc_xt as yc_sp, turbine1
+from sheltered import u1_xt as u1_sh, u2_xt2 as u2_sh, yc_xt as yc_sh
 
 wp1 = turbine1.wp  # the yawed turbine driving both comparisons
 
