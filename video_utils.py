@@ -211,9 +211,14 @@ def _draw_profiles(ax_u1, ax_u2, ax_yc, series: WakeSeries, *, diff: bool,
     _pad_ylim(ax_u2, *u2_refs, diff=diff)
     _pad_ylim(ax_yc, *yc_refs, diff=diff)
 
-    ax_u1.set_ylabel(r'$\Delta u_1$' if diff else r'$u_1$ [m/s]')
-    ax_u2.set_ylabel(r'$\Delta u_2$' if diff else r'$u_2$ [m/s]')
-    ax_yc.set_ylabel(r'$\Delta y_c$' if diff else (r'$y_c$ [cm]' if yc_cm else r'$y_c$ [m]'))
+    if percent:
+        ax_u1.set_ylabel(r'$\Delta u_1/\delta u_{1,\mathrm{env}}$')
+        ax_u2.set_ylabel(r'$\Delta u_2/\delta u_{2,\mathrm{env}}$')
+        ax_yc.set_ylabel(r'$\Delta y_c/\delta y_{c,\mathrm{env}}$')
+    else:
+        ax_u1.set_ylabel(r'$\Delta u_1$' if diff else r'$u_1$ [m/s]')
+        ax_u2.set_ylabel(r'$\Delta u_2$' if diff else r'$u_2$ [m/s]')
+        ax_yc.set_ylabel(r'$\Delta y_c$' if diff else (r'$y_c$ [cm]' if yc_cm else r'$y_c$ [m]'))
     ax_yc.set_xlabel(r'$x/D$')
 
     if percent:
