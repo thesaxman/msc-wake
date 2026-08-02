@@ -226,7 +226,7 @@ __marimo__/
 
 # This is just for ignoring some local stuff
 steady_state_debug.py
-outputs/
+outputs/*
 .claude
 
 # Visual Studio Code

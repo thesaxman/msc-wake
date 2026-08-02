@@ -48,11 +48,11 @@ class SolverParams(eqx.Module):
     
     
     @property
-    def t1(self):
+    def tf(self):
         return 2.0 * (self.wp.boundary - self.wp.upstream_bound)/self.wp.UINF
     @property
     def ts(self):
-        return jnp.linspace(0, self.t1, self.nt)
+        return jnp.linspace(0, self.tf, self.nt)
     @property
     def x_grid(self):
         return jnp.linspace(self.wp.upstream_bound, self.wp.boundary, self.nx)
@@ -134,5 +134,5 @@ def solver(y0, rhs_func, sp: SolverParams):
     return diffeqsolve(ODETerm(rhs_func), Tsit5(),
                         t0=0, t1=sp.ts[-1], dt0=None, y0=y0,
                         saveat=SaveAt(ts=sp.ts),
-                        stepsize_controller=PIDController(rtol=sp.rtol,atol=sp.atol),
+                        stepsize_controller=PIDController(rtol=sp.rtol,atol=sp.atol, pcoeff=sp.pcoeff, icoeff=sp.icoeff),
                         max_steps=sp.max_steps)

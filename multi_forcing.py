@@ -6,19 +6,12 @@ __date__ = "16/7/2026"
 from functools import partial
 
 import jax.numpy as jnp
-from model_params import wake_params as wp, solver_params as sp
+from model_params import wake_params as wp, solver_params as sp, turbines
 from wake_dynamics import sinusoid_gamma_t, make_turbine
 from unsteady_flow_solver import default_d_dt, solver
 
 from video_utils import WakeSeries, with_field, yaw_label_fn, full_video
 
-
-mk = partial(make_turbine, wp)
-
-turbines = [
-    mk(0.0, gamma_deg = -15.0),
-    mk(5.0, gamma_fn=sinusoid_gamma_t)
-]
 
 y0 = (jnp.zeros(sp.nx), jnp.zeros(sp.nx), jnp.zeros(sp.nx))
 
@@ -35,4 +28,4 @@ if __name__ == "__main__":
         y_grid,
     )
 
-    full_video(series, 'three_turbine_mf.mp4')
+    full_video(series, 'two_turbine_mf.mp4')
