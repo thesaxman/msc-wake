@@ -19,7 +19,7 @@ from unsteady_flow_solver import S1_default, S2_default
 def solve_steady_u1(p: wp):
     
     def du1_dx(x, u1, args): # ODE for u1 definition
-        return -dA_dx(x, p)/A(x, p)*u1 + S1_default(0.0,p)*G(x, p)/p.UINF
+        return -dA_dx(x, p)/A(x, p)*u1 + S1_default(0.0, [],p=p)*G(x, p)/p.UINF
     
     u1_sol = diffeqsolve(ODETerm(du1_dx), Tsit5(),
                          t0=p.upstream_bound, t1=p.boundary, dt0=0.01, y0=0.0,
@@ -32,7 +32,7 @@ def solve_steady_u1(p: wp):
 def solve_steady_u2(p: wp):
     
     def du2_dx(x, u2, args): # ODE for u2 definition
-        return -dA_dx(x, p)/A(x, p)*u2 + S2_default(0.0,p)*G(x,p)/p.UINF
+        return -dA_dx(x, p)/A(x, p)*u2 + S2_default(0.0, [], p=p)*G(x,p)/p.UINF
     
     u2_sol = diffeqsolve(ODETerm(du2_dx), Tsit5(),
                          t0=p.upstream_bound, t1=p.boundary, dt0=0.01, y0=0.0,

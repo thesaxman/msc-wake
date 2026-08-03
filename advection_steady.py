@@ -8,19 +8,15 @@ import matplotlib.pyplot as plt
 import jax
 import jax.numpy as jnp
 from diffrax import Tsit5, PIDController, diffeqsolve, ODETerm, SaveAt
-from model_params import wake_params as wp
+from model_params import wake_params as wp, turbines
 from wake_dynamics import Turbine, make_turbine, G, A, dA_dx, u_point
+from unsteady_flow_solver import delta_u1_0, delta_u2_0
 
-
-p = make_turbine(wp, 0.0)
 
 def solve_steady_u1(p: Turbine):
     
-    def adv_d_u1_0(u1, p: Turbine):
-        return (p.wp.UINF -u1)* (1-jnp.sqrt(1-p.wp.Ct * jnp.cos(p.wp.gamma) ** 2))
-    
     def du1_dx(x, u1, args): # ODE for u1 definition
-        return -dA_dx(x, p.wp)/A(x, p.wp)*u1 + adv_d_u1_0(u1, p)*G(x, p.wp)
+        return -dA_dx(x, p.wp)/A(x, p.wp)*u1 + delta_u1_0(0.0, p.wp)*G(x, p.wp)
     
     u1_sol = diffeqsolve(ODETerm(du1_dx), Tsit5(),
                          t0=p.wp.upstream_bound, t1=p.wp.boundary, dt0=0.01, y0=0.0,
@@ -32,13 +28,8 @@ def solve_steady_u1(p: Turbine):
 
 def solve_steady_u2(p: Turbine):
     
-    u1 = solve_steady_u1(p)
-    
-    def adv_d_u2_0(x, u2, p: Turbine):
-        return (p.wp.UINF -u1(x))* (0.25*p.wp.Ct * jnp.cos(p.wp.gamma)**2 * jnp.sin(p.wp.gamma))
-    
     def du2_dx(x, u2, args): # ODE for u1 definition
-        return -dA_dx(x, p.wp)/A(x, p.wp)*u2 + adv_d_u2_0(x, u2, p)*G(x, p.wp)
+        return -dA_dx(x, p.wp)/A(x, p.wp)*u2 + delta_u2_0(0.0, p.wp)*G(x, p.wp)
     
     u2_sol = diffeqsolve(ODETerm(du2_dx), Tsit5(),
                          t0=p.wp.upstream_bound, t1=p.wp.boundary, dt0=0.01, y0=0.0,
@@ -48,10 +39,8 @@ def solve_steady_u2(p: Turbine):
     
     return u2_sol.evaluate
 
-def solve_steady_yc(p: Turbine, u1 = None, u2 = None):
+def solve_steady_yc(p: Turbine, u2 = None):
     
-    if u1 is None:
-        u1 = solve_steady_u1(p)
     if u2 is None:
         u2 = solve_steady_u2(p)
     
@@ -73,11 +62,11 @@ if __name__ == "__main__":
     
     x = jnp.linspace(0.0, 12.0*wp.D, 100)
     y = jnp.linspace(-1.1*wp.D, 1.1*wp.D, 100)
-    u1 = solve_steady_u1(p)
+    u1 = solve_steady_u1(turbines[0])
     u1_x = jax.vmap(u1)(x)
-    u2 = solve_steady_u2(p)
+    u2 = solve_steady_u2(turbines[0])
     u2_x = jax.vmap(u2)(x)
-    yc_x = jax.vmap(solve_steady_yc(p, u1=u1, u2=u2))(x)
+    yc_x = jax.vmap(solve_steady_yc(turbines[0], u2=u2))(x)
     X, Y = jnp.meshgrid(x, y)
     
     u1_field = jax.vmap(u_point, in_axes=(0,0,0,None,None), out_axes=1)(x, yc_x, u1_x, y, wp)

@@ -19,7 +19,7 @@ def delta_u2_0(t, p: WakeParams):
     gamma  = p.gamma_at(t)
     return p.UINF*(0.25*p.Ct*jnp.cos(gamma)**2 * jnp.sin(gamma))
 
-def S2_default(t, u2, p: WakeParams):
+def S2_default(t, u1, p: WakeParams):
     return p.UINF * delta_u2_0(t, p)
 
 def d_dx(var, dx): 
