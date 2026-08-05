@@ -1,5 +1,5 @@
 """
-The following script is organises the model parameters used for calculating the
+The following script organises the model parameters used for calculating the
 flow field. The parameters are collected as wake dynamics parameters and solver scheme parameters.
 """
 from functools import partial
@@ -13,7 +13,7 @@ BASTANKHAH = WakeParams(
 )
 
 NREL5MW = WakeParams(
-    D=126, kw = 0.0834, Ct=0.8, gamma_deg=0.0, UINF=11.4 # kw and sigma not fitted so just for illustrative purposes 
+    D=126, kw = 0.31, Ct=0.8, gamma_deg=0.0, UINF=11.4, calibration="bastankhah-2021" # sigma not fitted so just for illustrative purposes 
 )
 
 MODELS = {

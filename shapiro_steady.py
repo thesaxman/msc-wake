@@ -10,16 +10,16 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffrax import diffeqsolve, Tsit5, ODETerm, SaveAt, PIDController
 
-from wake_dynamics import WakeParams as wp
+from wake_dynamics import WakeParams
 from model_params import wake_params
 from wake_dynamics import A, dA_dx, G
 from unsteady_flow_solver import S1_default, S2_default
 
 
-def solve_steady_u1(p: wp):
+def solve_steady_u1(p: WakeParams):
     
     def du1_dx(x, u1, args): # ODE for u1 definition
-        return -dA_dx(x, p)/A(x, p)*u1 + S1_default([],p)*G(x, p)/p.UINF
+        return -dA_dx(x, p)/A(x, p)*u1 + S1_default(0.0, [],p=p)*G(x, p)/p.UINF
     
     u1_sol = diffeqsolve(ODETerm(du1_dx), Tsit5(),
                          t0=p.upstream_bound, t1=p.boundary, dt0=0.01, y0=0.0,
@@ -29,10 +29,10 @@ def solve_steady_u1(p: wp):
     
     return u1_sol.evaluate
 
-def solve_steady_u2(p: wp):
+def solve_steady_u2(p: WakeParams):
     
     def du2_dx(x, u2, args): # ODE for u2 definition
-        return -dA_dx(x, p)/A(x, p)*u2 + S2_default([],p)*G(x,p)/p.UINF
+        return -dA_dx(x, p)/A(x, p)*u2 + S2_default(0.0, [], p=p)*G(x,p)/p.UINF
     
     u2_sol = diffeqsolve(ODETerm(du2_dx), Tsit5(),
                          t0=p.upstream_bound, t1=p.boundary, dt0=0.01, y0=0.0,
@@ -42,13 +42,13 @@ def solve_steady_u2(p: wp):
 
     return u2_sol.evaluate
 
-def solve_steady_yc(p: wp, u2 = None):
+def solve_steady_yc(p: WakeParams, u2 = None):
     
     if u2 is None:
         u2 = solve_steady_u2(p)
     # This function defines the ODE for the wake centreline deflection
     def dyc_dx(x, y, args):
-        return -u2(x) / p.UINF # taking streamwise aligned coordinate
+        return -u2(x) / p.UINF
     
     yc_sol = diffeqsolve(ODETerm(dyc_dx), Tsit5(), 
                          t0=p.upstream_bound, t1=p.boundary, dt0=0.01, y0=0.,
@@ -63,7 +63,7 @@ def solve_steady_yc(p: wp, u2 = None):
 if __name__ == "__main__":
 
     #Flow field can be first evaluated along x
-    x = jnp.linspace(0.0, wake_params.boundary, 100)
+    x = jnp.linspace(1.0*wake_params.D, 12.0*wake_params.D, 100)
     y = jnp.linspace(-1.1*wake_params.D, 1.1*wake_params.D, 100)
     u1_x = jax.vmap(solve_steady_u1(wake_params))(x)
     u2 = solve_steady_u2(wake_params)
@@ -74,6 +74,8 @@ if __name__ == "__main__":
     from wake_dynamics import u_point, dw
     
     u1_field = jax.vmap(u_point, in_axes=(0,0,0,None,None), out_axes=1)(x, yc_x, u1_x, y, wake_params)
+    
+    print(f'max u/U∞ = {float(u1_field.max()/wake_params.UINF):.2f}')
     
     # closed form solution for comparison
     
@@ -100,7 +102,7 @@ if __name__ == "__main__":
     cf = axes[0].pcolormesh(X/wake_params.D, Y/wake_params.D, u1_norm, cmap='RdBu_r', shading='auto')
     axes[0].plot(x/wake_params.D, yc_x/wake_params.D, color='white', linestyle='dashed', linewidth=1.5,
                 label=r'Wake centreline $y_c(x)$')
-    plt.colorbar(cf,  ax=axes[0], location='top', shrink=0.5, label=r'$u/U_\infty$ — streamwise deficit')
+    plt.colorbar(cf,  ax=axes[0], location='top', shrink=0.5, label=r'$\delta u/U_\infty$ — streamwise deficit')
     axes[0].set_ylabel(r'$y/D$')
     axes[0].set_title(r'Streamwise velocity deficit ($\gamma$ = {:.1f}°)'.format(wake_params.gamma_deg))
     axes[0].legend()
@@ -144,5 +146,5 @@ if __name__ == "__main__":
     
     axes[0].set_xlim(0,12)
     axes[-1].set_xlabel(r'$x/D$')
-    #plt.savefig("outputs/full_wake_comparisons.png", dpi=150)
+    plt.savefig("outputs/full_wake_comparisons.png", dpi=150)
     plt.show()

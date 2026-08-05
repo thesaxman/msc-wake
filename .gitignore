@@ -235,3 +235,5 @@ outputs/*
 
 # Built Visual Studio Code Extensions
 *.vsix
+
+NOTE.txt

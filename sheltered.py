@@ -19,17 +19,17 @@ u1_xt1, u2_xt1, yc_xt1 = solver(y0, default_d_dt([turbines[0]], sp), sp).ys
 
 i2 = int(jnp.argmin(jnp.abs(sp.x_grid-turbines[1].x0)))
 
-def S1_sheltered(t, p):
+def S1_sheltered(t, u1, p):
     #upstream deficit at turbine 2's location at time t
     u1_up = jnp.interp(t, sp.ts, u1_xt1[:, i2])
     p_local = dataclasses.replace(p, UINF=p.UINF - u1_up)
-    return S1_default(t, p_local)
+    return S1_default(t, u1, p_local)
 
-def S2_sheltered(t, p):
+def S2_sheltered(t, u1, p):
     #upstream deficit at turbine 2's location at time t
     u1_up = jnp.interp(t, sp.ts, u1_xt1[:, i2])
     p_local = dataclasses.replace(p, UINF=p.UINF - u1_up)
-    return S2_default(t, p_local)
+    return S2_default(t, u1, p_local)
 
 sp2 = dataclasses.replace(sp, S1=S1_sheltered, S2=S2_sheltered)
 
