@@ -10,13 +10,13 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from diffrax import diffeqsolve, Tsit5, ODETerm, SaveAt, PIDController
 
-from wake_dynamics import WakeParams as wp
+from wake_dynamics import WakeParams
 from model_params import wake_params
 from wake_dynamics import A, dA_dx, G
 from unsteady_flow_solver import S1_default, S2_default
 
 
-def solve_steady_u1(p: wp):
+def solve_steady_u1(p: WakeParams):
     
     def du1_dx(x, u1, args): # ODE for u1 definition
         return -dA_dx(x, p)/A(x, p)*u1 + S1_default(0.0, [],p=p)*G(x, p)/p.UINF
@@ -29,7 +29,7 @@ def solve_steady_u1(p: wp):
     
     return u1_sol.evaluate
 
-def solve_steady_u2(p: wp):
+def solve_steady_u2(p: WakeParams):
     
     def du2_dx(x, u2, args): # ODE for u2 definition
         return -dA_dx(x, p)/A(x, p)*u2 + S2_default(0.0, [], p=p)*G(x,p)/p.UINF
@@ -42,7 +42,7 @@ def solve_steady_u2(p: wp):
 
     return u2_sol.evaluate
 
-def solve_steady_yc(p: wp, u2 = None):
+def solve_steady_yc(p: WakeParams, u2 = None):
     
     if u2 is None:
         u2 = solve_steady_u2(p)
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     cf = axes[0].pcolormesh(X/wake_params.D, Y/wake_params.D, u1_norm, cmap='RdBu_r', shading='auto')
     axes[0].plot(x/wake_params.D, yc_x/wake_params.D, color='white', linestyle='dashed', linewidth=1.5,
                 label=r'Wake centreline $y_c(x)$')
-    plt.colorbar(cf,  ax=axes[0], location='top', shrink=0.5, label=r'$u/U_\infty$ — streamwise deficit')
+    plt.colorbar(cf,  ax=axes[0], location='top', shrink=0.5, label=r'$\delta u/U_\infty$ — streamwise deficit')
     axes[0].set_ylabel(r'$y/D$')
     axes[0].set_title(r'Streamwise velocity deficit ($\gamma$ = {:.1f}°)'.format(wake_params.gamma_deg))
     axes[0].legend()
@@ -146,5 +146,5 @@ if __name__ == "__main__":
     
     axes[0].set_xlim(0,12)
     axes[-1].set_xlabel(r'$x/D$')
-    #plt.savefig("outputs/full_wake_comparisons.png", dpi=150)
+    plt.savefig("outputs/full_wake_comparisons.png", dpi=150)
     plt.show()

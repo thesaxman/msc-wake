@@ -67,7 +67,7 @@ fig, axes = plt.subplots(2, 1, figsize=(12, 8))
 cf = axes[0].pcolormesh(X/D, Y/D, u_field, cmap='RdBu_r', shading='auto')
 axes[0].plot(x/D, yc/D, color='white', linestyle='dashed', linewidth=1.5,
              label='Wake centreline $y_c(x)$')
-plt.colorbar(cf, ax=axes[0], label='$u(x,y)$ [m/s]')
+plt.colorbar(cf, ax=axes[0], label=r'$\delta u(x,y)$ [m/s]')
 axes[0].set_ylabel('$y/D$')
 axes[0].set_title('Streamwise velocity deficit')
 axes[0].legend()

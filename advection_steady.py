@@ -9,9 +9,14 @@ import jax
 import jax.numpy as jnp
 from diffrax import Tsit5, PIDController, diffeqsolve, ODETerm, SaveAt
 from model_params import wake_params as wp, turbines
-from wake_dynamics import Turbine, make_turbine, G, A, dA_dx, u_point
+from wake_dynamics import Turbine, G, A, dA_dx, u_point, make_turbine
 from unsteady_flow_solver import delta_u1_0, delta_u2_0
 
+turbines[0] = make_turbine(wp, 0.0, gamma_deg=-15.0)
+g = turbines[0].wp.gamma_deg
+sign = "neg" if g < 0 else "pos"
+g = f"{g:.1f}".replace('.', 'p')
+filename  = f"outputs/full_wake_adv_v_shap_{sign}{g}deg.png"
 
 def solve_steady_u1(p: Turbine):
     
@@ -39,11 +44,13 @@ def solve_steady_u2(p: Turbine):
     
     return u2_sol.evaluate
 
-def solve_steady_yc(p: Turbine, u2 = None):
+def solve_steady_yc(p: Turbine, u1=None, u2=None):
     
     if u2 is None:
         u2 = solve_steady_u2(p)
-    
+    if u1 is None:
+        u1 = solve_steady_u1(p)
+
     # This function defines the ODE for the wake centreline deflection
     def dyc_dx(x, y, args):
         return -u2(x) / (p.wp.UINF - u1(x))
@@ -66,22 +73,23 @@ if __name__ == "__main__":
     u1_x = jax.vmap(u1)(x)
     u2 = solve_steady_u2(turbines[0])
     u2_x = jax.vmap(u2)(x)
-    yc_x = jax.vmap(solve_steady_yc(turbines[0], u2=u2))(x)
+    yc_x = jax.vmap(solve_steady_yc(turbines[0], u1=u1, u2=u2))(x)
     X, Y = jnp.meshgrid(x, y)
     
     u1_field = jax.vmap(u_point, in_axes=(0,0,0,None,None), out_axes=1)(x, yc_x, u1_x, y, wp)
     
-    print(f'max u/U∞ = {float(u1_field.max()/wp.UINF):.2f}')
+    print(f'Advected: max u/U∞ = {float(u1_field.max()/wp.UINF):.2f}')
     
     #Compare with shapiro steady equations
     
     from shapiro_steady import solve_steady_u1 as u1_steady_shap, solve_steady_u2 as u2_steady_shap, solve_steady_yc as yc_steady_shap
     
-    u1_x_shap = jax.vmap(u1_steady_shap(wp))(x)
-    u2_shap = u2_steady_shap(wp)
+    u1_x_shap = jax.vmap(u1_steady_shap(turbines[0].wp))(x)
+    u2_shap = u2_steady_shap(turbines[0].wp)
     u2_x_shap = jax.vmap(u2_shap)(x)
-    yc_x_shap = jax.vmap(yc_steady_shap(wp, u2 = u2_shap))(x)
-    u1_field_shap = jax.vmap(u_point, in_axes=(0,0,0,None,None), out_axes=1)(x, yc_x_shap, u1_x_shap, y, wp)
+    yc_x_shap = jax.vmap(yc_steady_shap(turbines[0].wp, u2 = u2_shap))(x)
+    u1_field_shap = jax.vmap(u_point, in_axes=(0,0,0,None,None), out_axes=1)(x, yc_x_shap, u1_x_shap, y, turbines[0].wp)
+    print(f'Shapiro: max u/U∞ = {float(u1_field_shap.max()/turbines[0].wp.UINF):.2f}')
     
     # --- plot ---
     fig, axes = plt.subplots(5, 1, figsize=(12, 14), sharex=True, layout = 'constrained')
@@ -90,10 +98,10 @@ if __name__ == "__main__":
     
     # streamwise deficit field
     u1_norm = u1_field/wp.UINF
-    cf = axes[0].pcolormesh(X/wp.D, Y/wp.D, u1_norm, cmap='RdBu_r', shading='auto')
+    cf = axes[0].pcolormesh(X/wp.D, Y/wp.D, u1_norm, cmap='plasma', shading='auto')
     axes[0].plot(x/wp.D, yc_x/wp.D, color='white', linestyle='dashed', linewidth=1.5,
                 label=r'Wake centreline $y_c(x)$')
-    plt.colorbar(cf,  ax=axes[0], location='top', shrink=0.5, label=r'$u/U_\infty$ — streamwise deficit')
+    plt.colorbar(cf,  ax=axes[0], location='top', shrink=0.5, label=r'$\delta u/U_\infty$ — streamwise deficit')
     axes[0].set_ylabel(r'$y/D$')
     axes[0].set_title(r'Streamwise velocity deficit ($\gamma$ = {:.1f}°)'.format(wp.gamma_deg))
     axes[0].legend()
@@ -137,5 +145,5 @@ if __name__ == "__main__":
     
     axes[0].set_xlim(0,12)
     axes[-1].set_xlabel(r'$x/D$')
-    #plt.savefig("outputs/full_wake_comparisons.png", dpi=150)
-    plt.show()
+    plt.savefig(filename, dpi=150)
+    #plt.show()

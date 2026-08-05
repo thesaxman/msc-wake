@@ -99,6 +99,11 @@ def diff_series(a: WakeSeries, b: WakeSeries, *, u1_scale=1.0, u2_scale=1.0, yc_
     """Elementwise a - b, optionally normalised per-variable (e.g. by envelope magnitudes)."""
     assert np.allclose(a.x_grid, b.x_grid), "series must share the same x grid"
     assert np.allclose(a.ts, b.ts), "series must share the same time grid"
+
+    print(f"max |du1|/du1_env = {np.max(np.abs(np.asarray(a.u1_xt) - np.asarray(b.u1_xt)) / u1_scale):.2e}")
+    print(f"max |du2|/du2_env = {np.max(np.abs(np.asarray(a.u2_xt) - np.asarray(b.u2_xt)) / u2_scale):.2e}")
+    print(f"max |dyc|/yc_max = {np.max(np.abs(np.asarray(a.yc_xt) - np.asarray(b.yc_xt)) / yc_scale):.2e}")
+
     return WakeSeries(
         x_grid=a.x_grid, ts=a.ts, wp=a.wp, label_fn=label_fn,
         u1_xt=(np.asarray(a.u1_xt) - np.asarray(b.u1_xt)) / u1_scale,
@@ -173,7 +178,7 @@ def _draw_field(ax, fig, series: WakeSeries, *, diff: bool, percent: bool,
         cl_label = r'$\Delta y_c$'
     else:
         mesh = ax.pcolormesh(x_norm, y_norm, frames[0], cmap='plasma', shading='auto', vmin=0, vmax=frames.max())
-        cbar_kwargs['label'] = r'$u_1$ [m/s]'
+        cbar_kwargs['label'] = r'$\delta u_1$ [m/s]'
         cl_label = 'Unsteady $y_c$' if steady is not None else '$y_c$'
 
     fig.colorbar(mesh, ax=ax, **cbar_kwargs)
@@ -216,8 +221,8 @@ def _draw_profiles(ax_u1, ax_u2, ax_yc, series: WakeSeries, *, diff: bool,
         ax_u2.set_ylabel(r'$\Delta u_2/\delta u_{2,\mathrm{env}}$')
         ax_yc.set_ylabel(r'$\Delta y_c/\delta y_{c,\mathrm{env}}$')
     else:
-        ax_u1.set_ylabel(r'$\Delta u_1$' if diff else r'$u_1$ [m/s]')
-        ax_u2.set_ylabel(r'$\Delta u_2$' if diff else r'$u_2$ [m/s]')
+        ax_u1.set_ylabel(r'$\Delta u_1$' if diff else r'$\delta u_1$ [m/s]')
+        ax_u2.set_ylabel(r'$\Delta u_2$' if diff else r'$\delta u_2$ [m/s]')
         ax_yc.set_ylabel(r'$\Delta y_c$' if diff else (r'$y_c$ [cm]' if yc_cm else r'$y_c$ [m]'))
     ax_yc.set_xlabel(r'$x/D$')
 
