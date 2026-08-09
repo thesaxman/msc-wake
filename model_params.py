@@ -9,7 +9,7 @@ from unsteady_flow_solver import SolverParams, make_turbine
 
 # This is from Bastankhah and Porté-Agel wind-tunnel setup with data fitted for kw and sigma0
 BASTANKHAH = WakeParams(
-    D=0.15, kw=0.0834, Ct=0.8, gamma_deg=0.0, UINF=4.88,
+    D=0.15, kw=0.0834, Ct=0.8, gamma_deg=0.0, UINF=4.88
 )
 
 NREL5MW = WakeParams(
@@ -30,6 +30,6 @@ mk = partial(make_turbine, wake_params)
 
 turbine1 = mk(0.0, gamma_deg=-15.0)
 turbine2 = mk(5.0, gamma_fn=sinusoid_gamma_t)
-#turbine3 = mk(10.0, gamm)
+#turbine3 = mk(10.0, gamma_deg=0.0)
 
 turbines = [turbine1, turbine2]

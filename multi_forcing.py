@@ -1,3 +1,5 @@
+#Scrap this idea it don't work
+
 """ A simple approach to visualising effect of n turbines in a single column"""
 
 __author__ = "Ali Alebeedan"
