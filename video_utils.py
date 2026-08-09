@@ -35,9 +35,9 @@ OUT_DIR = Path("outputs")
 OUT_DIR.mkdir(exist_ok=True)
 
 
-def make_field_frames(x_grid, yc_xt, u1_xt, y_grid, wp):
-    build_frame = jax.vmap(u_point, in_axes=(0, 0, 0, None, None), out_axes=1)
-    all_frames = jax.vmap(build_frame, in_axes=(None, 0, 0, None, None), out_axes=0)(x_grid, yc_xt, u1_xt, y_grid, wp)
+def make_field_frames(x_grid, yc_xt, u1_xt, y_grid, ts, wp):
+    build_frame = jax.vmap(u_point, in_axes=(0, 0, 0, None, None, None), out_axes=1)
+    all_frames = jax.vmap(build_frame, in_axes=(None, 0, 0, None, 0, None), out_axes=0)(x_grid, yc_xt, u1_xt, y_grid, ts, wp)
     assert all_frames.shape == (u1_xt.shape[0], y_grid.size, x_grid.size), all_frames.shape
     return np.asarray(all_frames)
 
@@ -90,7 +90,7 @@ class SteadyRef:
 
 def with_field(series: WakeSeries, y_grid) -> WakeSeries:
     """Return a copy of series with flow-field frames computed over y_grid."""
-    frames = make_field_frames(series.x_grid, series.yc_xt, series.u1_xt, y_grid, series.wp)
+    frames = make_field_frames(series.x_grid, series.yc_xt, series.u1_xt, y_grid, series.ts, series.wp)
     return dataclasses.replace(series, frames=frames, y_grid=np.asarray(y_grid))
 
 

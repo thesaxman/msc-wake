@@ -28,17 +28,13 @@ class WakeParams(eqx.Module):
     Ct:     float
     gamma_deg: float
     UINF:   float
-    sigma0_ratio: float = 0.235
+    sigma0_ratio: float =  0.35355339 # = sqrt(1/8)
     boundary_diams: float = 20.0
     upstream_diams: float = -4.0
     gamma_fn: Callable = eqx.field(static = True, default = constant_gamma)
     max_gamma_deg: float = 30.0
     calibration: str = eqx.field(static=True, default="bastankhah-2016")
     
-    
-    @property
-    def sigma0(self):
-        return self.sigma0_ratio* self.D
     
     @property
     def boundary(self):
@@ -59,6 +55,9 @@ class WakeParams(eqx.Module):
         """Yaw angle (in radians) at time t, via the configured control law."""
         return self.gamma_fn(t, self.gamma)
 
+    def sigma0(self, t):
+        return self.sigma0_ratio* self.D * jnp.cos(self.gamma_at(t))
+
 def dw(x, p: WakeParams):
     return wake_expansion(x, p.D, p.kw)
 
@@ -74,15 +73,14 @@ def expansion(x_grid, p): # to compute the expansion term w(x)/UINF (normalised 
 def G(x, p: WakeParams):
     return gaussian_forcing(x,p.D)
 
-def sigma_y(x, p: WakeParams):
-    return p.sigma0 * dw(x,p)
+def sigma_y(x, t, p: WakeParams):
+    return p.sigma0(t) * dw(x,p)
 
-def gaussian(x, yc, y, p: WakeParams):
-    return 0.5 * (p.D / 2 / p.sigma0)**2 * \
-        jnp.exp(-0.5 * ((y - yc) / sigma_y(x, p))**2)
+def gaussian(x, yc, y, t, p: WakeParams):
+    return jnp.exp(-0.5 * ((y - yc) / sigma_y(x, t, p))**2)
 
-def u_point(x, yc, u1, y, p: WakeParams):
-    return u1 * gaussian(x, yc, y, p)
+def u_point(x, yc, u1, y, t, p: WakeParams):
+    return u1 * gaussian(x, yc, y, t, p)
 
 MAX_YAW = float(jnp.radians(30)) # Max operating yaw taken as 30 degrees
 YAW_FREQUENCY = 8.333e-4  # NREL nominal yaw-rate normalised by full rotation for frequency

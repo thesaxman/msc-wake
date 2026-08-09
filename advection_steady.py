@@ -76,7 +76,7 @@ if __name__ == "__main__":
     yc_x = jax.vmap(solve_steady_yc(turbines[0], u1=u1, u2=u2))(x)
     X, Y = jnp.meshgrid(x, y)
     
-    u1_field = jax.vmap(u_point, in_axes=(0,0,0,None,None), out_axes=1)(x, yc_x, u1_x, y, wp)
+    u1_field = jax.vmap(u_point, in_axes=(0,0,0,None,None,None), out_axes=1)(x, yc_x, u1_x, y, 0.0, wp)
     
     print(f'Advected: max u/U∞ = {float(u1_field.max()/wp.UINF):.2f}')
     
@@ -88,7 +88,7 @@ if __name__ == "__main__":
     u2_shap = u2_steady_shap(turbines[0].wp)
     u2_x_shap = jax.vmap(u2_shap)(x)
     yc_x_shap = jax.vmap(yc_steady_shap(turbines[0].wp, u2 = u2_shap))(x)
-    u1_field_shap = jax.vmap(u_point, in_axes=(0,0,0,None,None), out_axes=1)(x, yc_x_shap, u1_x_shap, y, turbines[0].wp)
+    u1_field_shap = jax.vmap(u_point, in_axes=(0,0,0,None,None,None), out_axes=1)(x, yc_x_shap, u1_x_shap, y, 0.0, turbines[0].wp)
     print(f'Shapiro: max u/U∞ = {float(u1_field_shap.max()/turbines[0].wp.UINF):.2f}')
     
     # --- plot ---
