@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import equinox as eqx
 from diffrax import diffeqsolve, ODETerm, Tsit5, SaveAt, PIDController
 
-from wake_dynamics import WakeParams, G, expansion
+from wake_dynamics import WakeParams, G, expansion, u_point
 
 def delta_u1_0(t, p: WakeParams):
     gamma  = p.gamma_at(t)
@@ -83,6 +83,11 @@ def make_turbine(base: WakeParams, x0_diams: float, *,
     wp = dataclasses.replace(base, **overrides) if overrides else base
     return Turbine(wp=wp, x0=x0_diams * base.D)
 
+
+def turbine_index(tb: Turbine, sp: SolverParams):
+        """Index of the turbine in the solver's x-grid."""
+        return int(abs((tb.x0 - sp.x_grid)).argmin())
+
 def default_d_dt(turbines: list[Turbine], sp: SolverParams):
     """Couple RHS: all turbines share one flow field,
     their forcing and expansion effects superpose additively."""
@@ -152,6 +157,66 @@ def advecting_d_dt(turbines: list[Turbine], sp: SolverParams):
         return (du1_dt, du2_dt, dyc_dt)
         
     return rhs
+
+def S1_sheltered(t, u1, wp: WakeParams, sp: SolverParams, tb: Turbine, u1_xt0: jnp.ndarray):
+    #upstream deficit at turbine 2's location at time t
+    u1_up = jnp.interp(t, sp.ts, u1_xt0[:, turbine_index(tb, sp)])
+    p_local = dataclasses.replace(wp, UINF=wp.UINF - u1_up)
+    return S1_default(t, u1, p_local)
+
+def S2_sheltered(t, u1, wp: WakeParams, sp: SolverParams, tb: Turbine, u1_xt0: jnp.ndarray):
+    #upstream deficit at turbine 2's location at time t
+    u1_up = jnp.interp(t, sp.ts, u1_xt0[:, turbine_index(tb, sp)])
+    p_local = dataclasses.replace(wp, UINF=wp.UINF - u1_up)
+    return S2_default(t, u1, p_local)
+
+def sheltered_d_dt(tb: Turbine, sp: SolverParams, u1_xt0: jnp.ndarray, yc_xt0: jnp.ndarray):
+    """Couple RHS: strictly one turbine is sheltered by the upstream deficit of the other turbine, so we need to compute the upstream deficit at the sheltered turbine's location and adjust its forcing accordingly.
+    u1_xt0: (nt, nx) upstream area-averaged deficit sampled at ts"""
+    
+    #precompute forcing spatial terms
+    wp              = tb.wp
+    G_x             = G(sp.x_grid-tb.x0, tb.wp)
+    expansion_x     = expansion(sp.x_grid-tb.x0, tb.wp)
+    i_rotor         = turbine_index(tb, sp)
+    dt_s, nt        = sp.ts[1]-sp.ts[0], sp.ts.size
+    
+    def upstream_at(t, yc):
+        """Linear interp of upstream field in time -> (nx,)"""
+        idx = jnp.clip((t-sp.ts[0]) / dt_s, 0, nt-1)
+        i = jnp.clip(jnp.floor(idx).astype(int), 0, nt-2)
+        f = idx - i
+        u1_interp = ((1.0-f) * u1_xt0[i] + f * u1_xt0[i+1])
+        yc_interp = ((1.0-f) * yc_xt0[i] + f * yc_xt0[i+1])
+        return u_point(sp.x_grid, yc_interp, u1_interp, yc, t, wp)
+    
+    def rhs(t, state, args):
+        
+        u1, u2, yc = state
+        
+        U_local = wp.UINF - upstream_at(t, yc)
+        U_rotor = U_local[i_rotor]
+        
+        p_local = dataclasses.replace(wp, UINF=U_rotor)
+        S1 = U_rotor * delta_u1_0(t, p_local)
+        S2 = U_rotor * delta_u2_0(t, p_local)
+        
+        #advection terms
+        adv_u1 = -U_local * d_dx(u1, sp.dx)
+        adv_u2 = -U_local * d_dx(u2, sp.dx)
+        adv_yc = -U_local * d_dx(yc, sp.dx)
+        
+        #forcing terms
+        src_u1 = -U_local * expansion_x * u1 + S1 * G_x
+        src_u2 = -U_local * expansion_x * u2 + S2 * G_x
+        
+        du1_dt = adv_u1 + src_u1
+        du2_dt = adv_u2 + src_u2
+        dyc_dt = adv_yc - u2 # u2 is coupled to the centerline deflection equation
+        
+        return (du1_dt, du2_dt, dyc_dt)
+    return rhs
+
 
 def solver(y0, rhs_func, sp: SolverParams):
     return diffeqsolve(ODETerm(rhs_func), Tsit5(),
