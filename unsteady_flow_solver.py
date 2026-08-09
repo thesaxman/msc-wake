@@ -1,12 +1,13 @@
 
 from collections.abc import Callable
+import dataclasses
 
 
 import jax.numpy as jnp
 import equinox as eqx
 from diffrax import diffeqsolve, ODETerm, Tsit5, SaveAt, PIDController
 
-from wake_dynamics import WakeParams, G, expansion, Turbine
+from wake_dynamics import WakeParams, G, expansion
 
 def delta_u1_0(t, p: WakeParams):
     gamma  = p.gamma_at(t)
@@ -59,6 +60,28 @@ class SolverParams(eqx.Module):
     @property
     def dx(self):
         return self.x_grid[1]-self.x_grid[0]
+
+class Turbine(eqx.Module):
+    wp: WakeParams
+    x0: float = eqx.field(static = True, default = 0.0)
+
+def make_turbine(base: WakeParams, x0_diams: float, *,
+                 gamma_deg=None, gamma_fn=None):
+    """Build a Turbine from a base WakeParams, overriding only what's given.
+
+    Args:
+        base:      the shared baseline WakeParams
+        x0_diams:  streamwise position in rotor diameters
+        gamma_deg: override base yaw angle (degrees), if given
+        gamma_fn:  override control law, if given
+    """
+    overrides = {}
+    if gamma_deg is not None:
+        overrides['gamma_deg'] = gamma_deg
+    if gamma_fn is not None:
+        overrides['gamma_fn'] = gamma_fn
+    wp = dataclasses.replace(base, **overrides) if overrides else base
+    return Turbine(wp=wp, x0=x0_diams * base.D)
 
 def default_d_dt(turbines: list[Turbine], sp: SolverParams):
     """Couple RHS: all turbines share one flow field,

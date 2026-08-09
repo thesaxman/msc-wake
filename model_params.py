@@ -4,8 +4,8 @@ flow field. The parameters are collected as wake dynamics parameters and solver 
 """
 from functools import partial
 
-from wake_dynamics import WakeParams, make_turbine, sinusoid_gamma_t
-from unsteady_flow_solver import SolverParams
+from wake_dynamics import WakeParams, sinusoid_gamma_t
+from unsteady_flow_solver import SolverParams, make_turbine
 
 # This is from Bastankhah and Porté-Agel wind-tunnel setup with data fitted for kw and sigma0
 BASTANKHAH = WakeParams(

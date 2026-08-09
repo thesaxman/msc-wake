@@ -9,8 +9,8 @@ import jax
 import jax.numpy as jnp
 from diffrax import Tsit5, PIDController, diffeqsolve, ODETerm, SaveAt
 from model_params import wake_params as wp, turbines
-from wake_dynamics import Turbine, G, A, dA_dx, u_point, make_turbine
-from unsteady_flow_solver import delta_u1_0, delta_u2_0
+from wake_dynamics import G, A, dA_dx, u_point
+from unsteady_flow_solver import delta_u1_0, delta_u2_0, Turbine, make_turbine
 
 turbines[0] = make_turbine(wp, 0.0, gamma_deg=-15.0)
 g = turbines[0].wp.gamma_deg

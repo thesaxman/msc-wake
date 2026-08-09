@@ -7,7 +7,6 @@ import dataclasses
 
 import jax.numpy as jnp
 from model_params import wake_params as wp, solver_params as sp, turbines
-from wake_dynamics import make_turbine, sinusoid_gamma_t
 from unsteady_flow_solver import default_d_dt, solver, S1_default, S2_default
 
 from video_utils import WakeSeries, with_field, yaw_label_fn, full_video
