@@ -30,6 +30,6 @@ mk = partial(make_turbine, wake_params)
 
 turbine1 = mk(0.0, gamma_deg=-15.0)
 turbine2 = mk(5.0, gamma_fn=sinusoid_gamma_t)
-#turbine3 = mk(10.0, gamma_deg=0.0)
+turbine3 = mk(10.0, gamma_deg=0.0)
 
-turbines = [turbine1, turbine2]
+turbines = [turbine1, turbine2, turbine3]
