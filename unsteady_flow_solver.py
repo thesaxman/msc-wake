@@ -170,18 +170,21 @@ def S2_sheltered(t, u1, wp: WakeParams, sp: SolverParams, tb: Turbine, u1_xt0: j
     p_local = dataclasses.replace(wp, UINF=wp.UINF - u1_up)
     return S2_default(t, u1, p_local)
 
-def sheltered_d_dt(tb: Turbine, sp: SolverParams, u1_xt0: jnp.ndarray, yc_xt0: jnp.ndarray):
+def sheltered_d_dt(tb: Turbine, sp: SolverParams, solutions: list[jnp.ndarray]):
     """Couple RHS: strictly one turbine is sheltered by the upstream deficit of the other turbine, so we need to compute the upstream deficit at the sheltered turbine's location and adjust its forcing accordingly.
     u1_xt0: (nt, nx) upstream area-averaged deficit sampled at ts"""
-    
+
+    u1_per_turbine = [sol[0] for sol in solutions]
+    yc_per_turbine = [sol[2] for sol in solutions]
+
     #precompute forcing spatial terms
     wp              = tb.wp
     G_x             = G(sp.x_grid-tb.x0, tb.wp)
     expansion_x     = expansion(sp.x_grid-tb.x0, tb.wp)
     i_rotor         = turbine_index(tb, sp)
     dt_s, nt        = sp.ts[1]-sp.ts[0], sp.ts.size
-    
-    def upstream_at(t, yc):
+
+    def upstream_at(t, yc, u1_xt0, yc_xt0):
         """Linear interp of upstream field in time -> (nx,)"""
         idx = jnp.clip((t-sp.ts[0]) / dt_s, 0, nt-1)
         i = jnp.clip(jnp.floor(idx).astype(int), 0, nt-2)
@@ -189,12 +192,12 @@ def sheltered_d_dt(tb: Turbine, sp: SolverParams, u1_xt0: jnp.ndarray, yc_xt0: j
         u1_interp = ((1.0-f) * u1_xt0[i] + f * u1_xt0[i+1])
         yc_interp = ((1.0-f) * yc_xt0[i] + f * yc_xt0[i+1])
         return u_point(sp.x_grid, yc_interp, u1_interp, yc, t, wp)
-    
+
     def rhs(t, state, args):
-        
+
         u1, u2, yc = state
-        
-        U_local = wp.UINF - upstream_at(t, yc)
+
+        U_local = wp.UINF - sum(upstream_at(t, yc, u1_xt0, yc_xt0) for u1_xt0, yc_xt0 in zip(u1_per_turbine, yc_per_turbine))
         U_rotor = U_local[i_rotor]
         
         p_local = dataclasses.replace(wp, UINF=U_rotor)
