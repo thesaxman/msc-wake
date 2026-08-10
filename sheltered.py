@@ -33,4 +33,4 @@ if __name__ == "__main__":
         y_grid,
     )
 
-    full_video(series_list, 'two_turbine_sheltered.mp4')
+    full_video(series_list, f'{len(turbines)}_turbine_sheltered.mp4')
