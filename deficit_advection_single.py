@@ -12,8 +12,8 @@ import jax
 import jax.numpy as jnp
 from model_params import wake_params as wp, solver_params as sp
 
-from unsteady_flow_solver import advecting_d_dt, solver, adv_S1, adv_S2
-from wake_dynamics import make_turbine, sinusoid_gamma_t
+from unsteady_flow_solver import advecting_d_dt, solver, adv_S1, adv_S2, make_turbine
+from wake_dynamics import sinusoid_gamma_t
 from video_utils import WakeSeries, SteadyRef, with_field, yaw_label_fn, full_video
 
 from advection_steady import solve_steady_u1, solve_steady_u2, solve_steady_yc

@@ -7,8 +7,8 @@ __date__ = "10/7/2026"
 import jax
 import jax.numpy as jnp
 from model_params import wake_params as wp, solver_params as sp
-from wake_dynamics import sinusoid_gamma_t, make_turbine
-from unsteady_flow_solver import default_d_dt, solver
+from wake_dynamics import sinusoid_gamma_t
+from unsteady_flow_solver import default_d_dt, solver, make_turbine
 from video_utils import WakeSeries, with_field, yaw_label_fn, full_video
 
 
