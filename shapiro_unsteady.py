@@ -14,7 +14,7 @@ from model_params import wake_params as wp, solver_params as sp
 import unsteady_flow_solver as flowsolve
 import shapiro_steady as ss
 from wake_dynamics import sinusoid_gamma_t
-from video_utils import WakeSeries, SteadyRef, with_field, yaw_label_fn, field_video, profiles_video, full_video
+from video_utils import WakeSeries, SteadyRef, with_field, field_video, profiles_video, full_video
 
 
 # Single-turbine yaw scenarios shared with deficit_advection_single.py -- keep in sync.
@@ -60,7 +60,7 @@ if __name__ == "__main__":
     y_grid = jnp.linspace(-3*wp.D, 3*wp.D, 100)
 
     series = with_field(
-        WakeSeries(x_grid, sp.ts, u1_xt, u2_xt, yc_xt, wp, label_fn=yaw_label_fn([turbine.wp], sp.ts)),
+        WakeSeries(x_grid, sp.ts, u1_xt, u2_xt, yc_xt, turbine),
         y_grid,
     )
 

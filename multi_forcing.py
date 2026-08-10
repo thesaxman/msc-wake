@@ -1,4 +1,4 @@
-#Scrap this idea it don't work
+# deprecated, superseded by sheltered.py's N-turbine loop — not worth fixing
 
 """ A simple approach to visualising effect of n turbines in a single column"""
 
@@ -25,9 +25,9 @@ if __name__ == "__main__":
     y_grid = jnp.linspace(-3.0*D, 3*D, 100)
 
     series = with_field(
-        WakeSeries(x_grid, sp.ts, u1_xt, u2_xt, yc_xt, wp,
-                   label_fn=yaw_label_fn([tb.wp for tb in turbines], sp.ts)),
+        WakeSeries(x_grid, sp.ts, u1_xt, u2_xt, yc_xt, turbines[0]),
         y_grid,
     )
 
-    full_video(series, 'two_turbine_mf.mp4')
+    full_video(series, 'two_turbine_mf.mp4',
+               label_fn=yaw_label_fn([tb.wp for tb in turbines], sp.ts))
