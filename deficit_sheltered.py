@@ -47,9 +47,9 @@ if __name__ == "__main__":
     y_grid = jnp.linspace(-3*wp.D, 3*wp.D, 100)
 
     series = with_field(
-        WakeSeries(sp_adv.x_grid, sp_adv.ts, u1_xt, u2_xt, yc_xt, wp,
-                   label_fn=yaw_label_fn([tb.wp for tb in turbines], sp_adv.ts)),
+        WakeSeries(sp_adv.x_grid, sp_adv.ts, u1_xt, u2_xt, yc_xt, turbines[0]),
         y_grid,
     )
 
-    full_video(series, 'two_turbine_deficit_sheltered.mp4')
+    full_video(series, 'two_turbine_deficit_sheltered.mp4',
+               label_fn=yaw_label_fn([tb.wp for tb in turbines], sp_adv.ts))

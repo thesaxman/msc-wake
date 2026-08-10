@@ -13,8 +13,8 @@ from model_params import wake_params as wp, solver_params as sp
 
 import unsteady_flow_solver as flowsolve
 import shapiro_steady as ss
-from wake_dynamics import make_turbine, sinusoid_gamma_t
-from video_utils import WakeSeries, SteadyRef, with_field, yaw_label_fn, field_video, profiles_video, full_video
+from wake_dynamics import sinusoid_gamma_t
+from video_utils import WakeSeries, SteadyRef, with_field, field_video, profiles_video, full_video
 
 
 # Single-turbine yaw scenarios shared with deficit_advection_single.py -- keep in sync.
@@ -32,7 +32,7 @@ def run(case: str):
     is a SteadyRef built from the matching closed-form steady solution (skipped for
     the sinusoidal case, which has no valid static reference).
     """
-    turbine = make_turbine(wp, 0.0, **YAW_CASES[case])
+    turbine = flowsolve.make_turbine(wp, 0.0, **YAW_CASES[case])
 
     x_grid = sp.x_grid
     y0 = (jnp.zeros(sp.nx),
@@ -60,7 +60,7 @@ if __name__ == "__main__":
     y_grid = jnp.linspace(-3*wp.D, 3*wp.D, 100)
 
     series = with_field(
-        WakeSeries(x_grid, sp.ts, u1_xt, u2_xt, yc_xt, wp, label_fn=yaw_label_fn([turbine.wp], sp.ts)),
+        WakeSeries(x_grid, sp.ts, u1_xt, u2_xt, yc_xt, turbine),
         y_grid,
     )
 

@@ -73,7 +73,7 @@ if __name__ == "__main__":
     
     from wake_dynamics import u_point, dw
     
-    u1_field = jax.vmap(u_point, in_axes=(0,0,0,None,None), out_axes=1)(x, yc_x, u1_x, y, wake_params)
+    u1_field = jax.vmap(u_point, in_axes=(0,0,0,None,None,None), out_axes=1)(x, yc_x, u1_x, y, 0.0, wake_params)
     
     print(f'max u/U∞ = {float(u1_field.max()/wake_params.UINF):.2f}')
     
@@ -91,7 +91,7 @@ if __name__ == "__main__":
         return u2_0/(dw(x,wake_params)**2)*0.5*(1+ jax.scipy.special.erf(x/(wake_params.D/2*jnp.sqrt(2))))
     yc_closed = jax.vmap(solve_steady_yc(wake_params, u2=u2_closed))(x)
     
-    u1_closed_field = jax.vmap(u_point, in_axes=(0,0,0,None,None), out_axes=1)(x, yc_closed, u1_closed, y, wake_params)
+    u1_closed_field = jax.vmap(u_point, in_axes=(0,0,0,None,None,None), out_axes=1)(x, yc_closed, u1_closed, y, 0.0, wake_params)
     
     # --- plot ---
     fig, axes = plt.subplots(5, 1, figsize=(12, 14), sharex=True, layout = 'constrained')
