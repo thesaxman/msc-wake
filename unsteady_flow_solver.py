@@ -85,8 +85,8 @@ def make_turbine(base: WakeParams, x0_diams: float, *,
 
 
 def turbine_index(tb: Turbine, sp: SolverParams):
-        """Index of the turbine in the solver's x-grid."""
-        return int(abs((tb.x0 - sp.x_grid)).argmin())
+    """Index of the turbine in the solver's x-grid."""
+    return int(abs((tb.x0 - sp.x_grid)).argmin())
 
 def default_d_dt(turbines: list[Turbine], sp: SolverParams):
     """Couple RHS: all turbines share one flow field,
