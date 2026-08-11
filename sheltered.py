@@ -3,8 +3,6 @@
 __author__ = "Ali Alebeedan"
 __date__ = "29/7/2026"
 
-import dataclasses
-
 import jax.numpy as jnp
 from model_params import wake_params as wp, solver_params as sp, turbines
 from unsteady_flow_solver import default_d_dt, solver, sheltered_d_dt
