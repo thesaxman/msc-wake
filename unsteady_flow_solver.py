@@ -176,11 +176,12 @@ def S2_sheltered(t, u1, wp: WakeParams, sp: SolverParams, tb: Turbine, u1_xt0: j
     p_local = dataclasses.replace(wp, UINF=wp.UINF - u1_up)
     return S2_default(t, u1, p_local)
 
-def sheltered_d_dt(tb: Turbine, sp: SolverParams, solutions: list[jnp.ndarray]):
+def sheltered_d_dt(tb: Turbine, sp: SolverParams, solutions: list[jnp.ndarray], skew: bool = False):
     """Couple RHS: strictly one turbine is sheltered by the upstream deficit of the other turbine, so we need to compute the upstream deficit at the sheltered turbine's location and adjust its forcing accordingly.
     u1_xt0: (nt, nx) upstream area-averaged deficit sampled at ts"""
     
     u1_per_turbine = [sol[0] for sol in solutions]
+    u2_per_turbine = [sol[1] for sol in solutions] if skew else None
     yc_per_turbine = [sol[2] for sol in solutions]
     
     #precompute forcing spatial terms
@@ -197,40 +198,121 @@ def sheltered_d_dt(tb: Turbine, sp: SolverParams, solutions: list[jnp.ndarray]):
         f = idx - i
         u1_interp = ((1.0-f) * u1_xt0[i] + f * u1_xt0[i+1])
         yc_interp = ((1.0-f) * yc_xt0[i] + f * yc_xt0[i+1])
-        return u_point(sp.x_grid, yc_interp, u1_interp, yc, t, wp)
+        return u_point(sp.x_grid, yc_interp, u1_interp, yc, t, wp) # returns the upstream deficit profile at time t
+    def u2_at(t, u2_xt0):
+        """Linear interp of upstream field in time -> (nx,)"""
+        idx = jnp.clip((t-sp.ts[0]) / dt_s, 0, nt-1)
+        i = jnp.clip(jnp.floor(idx).astype(int), 0, nt-2)
+        f = idx - i
+        return (1.0-f) * u2_xt0[i] + f * u2_xt0[i+1] # this gives the spatial profile of upstream u2 at time t
+    if skew:
+        def skew_at(U_rotor, u2_rotor):
+            """Compute the effective skew angle at time t based on the upstream deficit and centerline deflection."""
+            skew_angle = jnp.arctan2(-(u2_rotor), U_rotor)  # Placeholder for actual calculation
+            return skew_angle
+    def rhs(t, state, args):
+        
+        u1, u2, yc = state
+        
+        U_up = wp.UINF - sum(upstream_at(t, yc, u1_xt0, yc_xt0) for u1_xt0, yc_xt0 in zip(u1_per_turbine, yc_per_turbine)) # (nx,) array of local advection velocities at time t
+        U_rotor = U_up[i_rotor] # scalar - the local advection velocity at the rotor location of the sheltered turbine
+        p_local = dataclasses.replace(p_local, UINF=U_rotor)
+        
+        u2_up = u2_at(t, sum(u2_per_turbine)) # (nx,) array of local u2 at time t
+        
+        if skew:
+            u2_rotor = u2_up[i_rotor] # scalar - the local u2 at the rotor location of the sheltered turbine
+            skew_angle = skew_at(U_rotor, u2_rotor)
+            def gamma_fn(t, gamma):
+                return wp.gamma_at(t) - skew_angle  # Placeholder for actual control law based on skew angle
+            p_local = dataclasses.replace(p_local, gamma_fn=gamma_fn)
+        
+        S1 = U_up * delta_u1_0(t, p_local)
+        S2 = U_up * delta_u2_0(t, p_local)
+        
+        #advection terms
+        adv_u1 = -U_up * d_dx(u1, sp.dx)
+        adv_u2 = -U_up * d_dx(u2, sp.dx)
+        adv_yc = -U_up * d_dx(yc, sp.dx)
+        
+        #forcing terms
+        src_u1 = -U_up * expansion_x * u1 + S1 * G_x
+        src_u2 = -U_up * expansion_x * u2 + S2 * G_x
+        
+        du1_dt = adv_u1 + src_u1
+        du2_dt = adv_u2 + src_u2
+        dyc_dt = adv_yc - (u2 + u2_up) # u2 is coupled to the centerline deflection equation
+        
+        return (du1_dt, du2_dt, dyc_dt)
+    return rhs
+
+def advecting_sheltered_d_dt(tb: Turbine, sp: SolverParams, solutions: list[jnp.ndarray], skew: bool = False):
+    """Couple RHS: strictly one turbine is sheltered by the upstream deficit of the other turbine, so we need to compute the upstream deficit at the sheltered turbine's location and adjust its forcing accordingly.
+    u1_xt0: (nt, nx) upstream area-averaged deficit sampled at ts"""
     
-    # def skew_at(t, u1, u2, yc, u1_xt0, yc_xt0):
-    #     """Compute the effective skew angle at time t based on the upstream deficit and centerline deflection."""
-    #     u1_up = upstream_at(t, yc, u1_xt0, yc_xt0)
-    #     # Compute the effective yaw angle based on the upstream deficit
-    #     effective_yaw_angle = jnp.arctan2(-u2, wp.UINF - u1_up-u1)  # Placeholder for actual calculation
-    #     return effective_yaw_angle
+    u1_per_turbine = [sol[0] for sol in solutions]
+    u2_per_turbine = [sol[1] for sol in solutions] if skew else None
+    yc_per_turbine = [sol[2] for sol in solutions]
+    
+    #precompute forcing spatial terms
+    wp              = tb.wp
+    G_x             = G(sp.x_grid-tb.x0, tb.wp)
+    expansion_x     = expansion(sp.x_grid-tb.x0, tb.wp)
+    i_rotor         = turbine_index(tb, sp)
+    dt_s, nt        = sp.ts[1]-sp.ts[0], sp.ts.size
+    
+    def upstream_at(t, yc, u1_xt0, yc_xt0):
+        """Linear interp of upstream field in time -> (nx,)"""
+        idx = jnp.clip((t-sp.ts[0]) / dt_s, 0, nt-1)
+        i = jnp.clip(jnp.floor(idx).astype(int), 0, nt-2)
+        f = idx - i
+        u1_interp = ((1.0-f) * u1_xt0[i] + f * u1_xt0[i+1])
+        yc_interp = ((1.0-f) * yc_xt0[i] + f * yc_xt0[i+1])
+        return u_point(sp.x_grid, yc_interp, u1_interp, yc, t, wp) # returns the upstream deficit profile at time t
+    def u2_at(t, u2_xt0):
+        """Linear interp of upstream field in time -> (nx,)"""
+        idx = jnp.clip((t-sp.ts[0]) / dt_s, 0, nt-1)
+        i = jnp.clip(jnp.floor(idx).astype(int), 0, nt-2)
+        f = idx - i
+        return (1.0-f) * u2_xt0[i] + f * u2_xt0[i+1]  # this gives the spatial profile of upstream u2 at time t
+    if skew:
+        
+        def skew_at(u1, u2, U_rotor, u2_rotor):
+            """Compute the effective skew angle at time t based on the upstream deficit and centerline deflection."""
+            skew_angle = jnp.arctan2(-(u2_rotor+u2), U_rotor-u1)  # Placeholder for actual calculation
+            return skew_angle
     
     def rhs(t, state, args):
         
         u1, u2, yc = state
         
-        U_local = wp.UINF - sum(upstream_at(t, yc, u1_xt0, yc_xt0) for u1_xt0, yc_xt0 in zip(u1_per_turbine, yc_per_turbine))
-        U_rotor = U_local[i_rotor]
-        
-        #skew_t = partial(skew_at, u1=u1, u2=u2, yc, u1_per_turbine[0], yc_per_turbine[0])
-        
+        U_up = wp.UINF - sum(upstream_at(t, yc, u1_xt0, yc_xt0) for u1_xt0, yc_xt0 in zip(u1_per_turbine, yc_per_turbine)) # (nx,) array of local advection velocities at time t
+        U_rotor = U_up[i_rotor] # scalar - the local advection velocity at the rotor location of the sheltered turbine
         p_local = dataclasses.replace(wp, UINF=U_rotor)
-        S1 = U_rotor * delta_u1_0(t, p_local)
-        S2 = U_rotor * delta_u2_0(t, p_local)
+        
+        u2_up = u2_at(t, sum(u2_per_turbine)) # (nx,) array of local u2 at time t
+        
+        if skew:
+            u2_rotor = u2_up[i_rotor]
+            skew_angle = skew_at(u1, u2, U_rotor, u2_rotor)
+            def gamma_fn(t, gamma):
+                return wp.gamma_at(t) - skew_angle  # Placeholder for actual control law based on skew angle
+            p_local = dataclasses.replace(p_local, gamma_fn=gamma_fn)
+        S1 = (U_rotor - u1) * delta_u1_0(t, p_local)
+        S2 = (U_rotor - u1) * delta_u2_0(t, p_local)
         
         #advection terms
-        adv_u1 = -U_local * d_dx(u1, sp.dx)
-        adv_u2 = -U_local * d_dx(u2, sp.dx)
-        adv_yc = -U_local * d_dx(yc, sp.dx)
+        adv_u1 = -(U_up - u1) * d_dx_upwind(u1, (U_up - u1), sp.dx)
+        adv_u2 = -(U_up - u1) * d_dx_upwind(u2, (U_up - u1), sp.dx)
+        adv_yc = -(U_up - u1) * d_dx_upwind(yc, (U_up - u1), sp.dx)
         
         #forcing terms
-        src_u1 = -U_local * expansion_x * u1 + S1 * G_x
-        src_u2 = -U_local * expansion_x * u2 + S2 * G_x
+        src_u1 = -(U_up - u1) * expansion_x * u1 + S1 * G_x
+        src_u2 = -(U_up - u1) * expansion_x * u2 + S2 * G_x
         
         du1_dt = adv_u1 + src_u1
         du2_dt = adv_u2 + src_u2
-        dyc_dt = adv_yc - u2 # u2 is coupled to the centerline deflection equation
+        dyc_dt = adv_yc - (u2+u2_up) # u2 is coupled to the centerline deflection equation
         
         return (du1_dt, du2_dt, dyc_dt)
     return rhs
