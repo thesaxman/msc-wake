@@ -181,7 +181,8 @@ def sheltered_d_dt(tb: Turbine, sp: SolverParams, solutions: list[jnp.ndarray], 
     u1_xt0: (nt, nx) upstream area-averaged deficit sampled at ts"""
     
     u1_per_turbine = [sol[0] for sol in solutions]
-    u2_per_turbine = [sol[1] for sol in solutions] if skew else None
+    u2_per_turbine = [sol[1] for sol in solutions]
+    u2_sum = sum(u2_per_turbine)
     yc_per_turbine = [sol[2] for sol in solutions]
     
     #precompute forcing spatial terms
@@ -191,19 +192,20 @@ def sheltered_d_dt(tb: Turbine, sp: SolverParams, solutions: list[jnp.ndarray], 
     i_rotor         = turbine_index(tb, sp)
     dt_s, nt        = sp.ts[1]-sp.ts[0], sp.ts.size
     
+    def _frac(t):
+        idx = jnp.clip((t - sp.ts[0]) / dt_s, 0.0, nt - 1.0)
+        i   = jnp.clip(jnp.floor(idx).astype(int), 0, nt - 2)
+        return i, idx - i
+    
     def upstream_at(t, yc, u1_xt0, yc_xt0):
         """Linear interp of upstream field in time -> (nx,)"""
-        idx = jnp.clip((t-sp.ts[0]) / dt_s, 0, nt-1)
-        i = jnp.clip(jnp.floor(idx).astype(int), 0, nt-2)
-        f = idx - i
+        i, f = _frac(t)
         u1_interp = ((1.0-f) * u1_xt0[i] + f * u1_xt0[i+1])
         yc_interp = ((1.0-f) * yc_xt0[i] + f * yc_xt0[i+1])
         return u_point(sp.x_grid, yc_interp, u1_interp, yc, t, wp) # returns the upstream deficit profile at time t
     def u2_at(t, u2_xt0):
         """Linear interp of upstream field in time -> (nx,)"""
-        idx = jnp.clip((t-sp.ts[0]) / dt_s, 0, nt-1)
-        i = jnp.clip(jnp.floor(idx).astype(int), 0, nt-2)
-        f = idx - i
+        i, f = _frac(t)
         return (1.0-f) * u2_xt0[i] + f * u2_xt0[i+1] # this gives the spatial profile of upstream u2 at time t
     if skew:
         def skew_at(U_rotor, u2_rotor):
@@ -216,19 +218,18 @@ def sheltered_d_dt(tb: Turbine, sp: SolverParams, solutions: list[jnp.ndarray], 
         
         U_up = wp.UINF - sum(upstream_at(t, yc, u1_xt0, yc_xt0) for u1_xt0, yc_xt0 in zip(u1_per_turbine, yc_per_turbine)) # (nx,) array of local advection velocities at time t
         U_rotor = U_up[i_rotor] # scalar - the local advection velocity at the rotor location of the sheltered turbine
-        p_local = dataclasses.replace(p_local, UINF=U_rotor)
         
-        u2_up = u2_at(t, sum(u2_per_turbine)) # (nx,) array of local u2 at time t
+        u2_up = u2_at(t, u2_sum) # (nx,) array of local u2 at time t
         
         if skew:
             u2_rotor = u2_up[i_rotor] # scalar - the local u2 at the rotor location of the sheltered turbine
             skew_angle = skew_at(U_rotor, u2_rotor)
-            def gamma_fn(t, gamma):
-                return wp.gamma_at(t) - skew_angle  # Placeholder for actual control law based on skew angle
-            p_local = dataclasses.replace(p_local, gamma_fn=gamma_fn)
-        
-        S1 = U_up * delta_u1_0(t, p_local)
-        S2 = U_up * delta_u2_0(t, p_local)
+            gamma_effective = wp.gamma_at(t) - skew_angle  # Placeholder for actual control law based on skew angle
+        else:
+            gamma_effective = wp.gamma_at(t)
+        cg, sg = jnp.cos(gamma_effective), jnp.sin(gamma_effective)
+        S1 = U_up * U_rotor * (1-jnp.sqrt(1-wp.Ct*cg**2))
+        S2 = U_up * U_rotor * (0.25*wp.Ct*cg**2 * sg)
         
         #advection terms
         adv_u1 = -U_up * d_dx(u1, sp.dx)
@@ -261,19 +262,20 @@ def advecting_sheltered_d_dt(tb: Turbine, sp: SolverParams, solutions: list[jnp.
     i_rotor         = turbine_index(tb, sp)
     dt_s, nt        = sp.ts[1]-sp.ts[0], sp.ts.size
     
+    def _frac(t):
+        idx = jnp.clip((t - sp.ts[0]) / dt_s, 0.0, nt - 1.0)
+        i   = jnp.clip(jnp.floor(idx).astype(int), 0, nt - 2)
+        return i, idx - i
+    
     def upstream_at(t, yc, u1_xt0, yc_xt0):
         """Linear interp of upstream field in time -> (nx,)"""
-        idx = jnp.clip((t-sp.ts[0]) / dt_s, 0, nt-1)
-        i = jnp.clip(jnp.floor(idx).astype(int), 0, nt-2)
-        f = idx - i
+        i, f = _frac(t)
         u1_interp = ((1.0-f) * u1_xt0[i] + f * u1_xt0[i+1])
         yc_interp = ((1.0-f) * yc_xt0[i] + f * yc_xt0[i+1])
         return u_point(sp.x_grid, yc_interp, u1_interp, yc, t, wp) # returns the upstream deficit profile at time t
     def u2_at(t, u2_xt0):
         """Linear interp of upstream field in time -> (nx,)"""
-        idx = jnp.clip((t-sp.ts[0]) / dt_s, 0, nt-1)
-        i = jnp.clip(jnp.floor(idx).astype(int), 0, nt-2)
-        f = idx - i
+        i, f = _frac(t)
         return (1.0-f) * u2_xt0[i] + f * u2_xt0[i+1]  # this gives the spatial profile of upstream u2 at time t
     if skew:
         

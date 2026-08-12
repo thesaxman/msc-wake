@@ -21,22 +21,6 @@ y0 = (jnp.zeros(sp_adv.nx), jnp.zeros(sp_adv.nx), jnp.zeros(sp_adv.nx))
 
 u1_xt1, u2_xt1, yc_xt1 = solver(y0, advecting_d_dt([turbines[0]], sp_adv), sp_adv).ys
 
-i2 = int(jnp.argmin(jnp.abs(sp_adv.x_grid-turbines[1].x0)))
-
-def S1_sheltered(t, u1, p):
-    #upstream deficit at turbine 2's location at time t
-    u1_up = jnp.interp(t, sp_adv.ts, u1_xt1[:, i2])
-    p_local = dataclasses.replace(p, UINF=p.UINF - u1_up)
-    return adv_S1(t, u1, p_local)
-
-def S2_sheltered(t, u1, p):
-    #upstream deficit at turbine 2's location at time t
-    u1_up = jnp.interp(t, sp_adv.ts, u1_xt1[:, i2])
-    p_local = dataclasses.replace(p, UINF=p.UINF - u1_up)
-    return adv_S2(t, u1, p_local)
-
-sp2_adv = dataclasses.replace(sp_adv, S1=S1_sheltered, S2=S2_sheltered)
-
 u1_xt2, u2_xt2, yc_xt2 = solver(y0, advecting_d_dt([turbines[1]], sp2_adv), sp2_adv).ys
 u1_xt = u1_xt1 + u1_xt2
 u2_xt = u2_xt1 + u2_xt2
