@@ -28,7 +28,7 @@ class WakeParams(eqx.Module):
     Ct:     float
     gamma_deg: float
     UINF:   float
-    sigma0_ratio: float =  0.35355339 # = sqrt(1/8)
+    sigma0_ratio: float = 0.235
     boundary_diams: float = 20.0
     upstream_diams: float = -4.0
     gamma_fn: Callable = eqx.field(static = True, default = constant_gamma)
@@ -56,7 +56,9 @@ class WakeParams(eqx.Module):
         return self.gamma_fn(t, self.gamma)
 
     def sigma0(self, t):
-        return self.sigma0_ratio* self.D * jnp.cos(self.gamma_at(t))
+        # Non-time-dependent (original Shapiro formulation): t is accepted
+        # for signature compatibility but otherwise ignored.
+        return self.sigma0_ratio* self.D
 
 def dw(x, p: WakeParams):
     return wake_expansion(x, p.D, p.kw)
@@ -77,7 +79,8 @@ def sigma_y(x, t, p: WakeParams):
     return p.sigma0(t) * dw(x,p)
 
 def gaussian(x, yc, y, t, p: WakeParams):
-    return jnp.exp(-0.5 * ((y - yc) / sigma_y(x, t, p))**2)
+    return 0.5 * (p.D / 2 / p.sigma0(t))**2 * \
+        jnp.exp(-0.5 * ((y - yc) / sigma_y(x, t, p))**2)
 
 def u_point(x, yc, u1, y, t, p: WakeParams):
     return u1 * gaussian(x, yc, y, t, p)
