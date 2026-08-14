@@ -10,6 +10,8 @@ from diffrax import diffeqsolve, ODETerm, Tsit5, SaveAt, PIDController
 
 from wake_dynamics import WakeParams, G, expansion, u_point
 
+### Solver Functions ###
+
 def du1_0(t, p: WakeParams):
     gamma  = p.gamma_at(t)
     return p.UINF*(1-jnp.sqrt(1-p.Ct*jnp.cos(gamma)**2))
@@ -34,6 +36,13 @@ def d_dx_upwind(var, speed, dx):
     fwd = (jnp.roll(var, -1) - var) / dx # when speed < 0
     d = jnp.where(speed > 0, back, fwd)
     return d.at[0].set(0.0)
+
+def skew_at(U_rotor, du2_rotor):
+            """Compute the effective skew angle (in radians) at time t based on the upstream deficit and centerline deflection."""
+            skew_angle = jnp.arctan2(-(du2_rotor), U_rotor)
+            return skew_angle
+
+### Solver Parameters ###
 
 class SolverParams(eqx.Module):
 
@@ -66,6 +75,8 @@ class Turbine(eqx.Module):
     wp: WakeParams
     x0: float = eqx.field(static = True, default = 0.0)
 
+### Turbine tools
+
 def make_turbine(base: WakeParams, x0_diams: float, *,
                  gamma_deg=None, gamma_fn=None):
     """Build a Turbine from a base WakeParams, overriding only what's given.
@@ -84,10 +95,11 @@ def make_turbine(base: WakeParams, x0_diams: float, *,
     wp = dataclasses.replace(base, **overrides) if overrides else base
     return Turbine(wp=wp, x0=x0_diams * base.D)
 
-
 def turbine_index(tb: Turbine, sp: SolverParams):
     """Index of the turbine in the solver's x-grid."""
     return int(abs((tb.x0 - sp.x_grid)).argmin())
+
+### Shapiro methodology
 
 def default_d_dt(turbines: list[Turbine], sp: SolverParams):
     """Couple RHS: all turbines share one flow field,
@@ -119,6 +131,8 @@ def default_d_dt(turbines: list[Turbine], sp: SolverParams):
         return (ddu1_dt, ddu2_dt, dyc_dt)
 
     return rhs
+
+### Shapiro with advecting deficit-aware velocity
 
 def adv_S1(t, du1, wp: WakeParams):
     return (wp.UINF - du1) * du1_0(t, wp)
@@ -159,11 +173,7 @@ def advecting_d_dt(turbines: list[Turbine], sp: SolverParams):
 
     return rhs
 
-def skew_at(U_rotor, du2_rotor):
-            """Compute the effective skew angle (in radians) at time t based on the upstream deficit and centerline deflection."""
-            skew_angle = jnp.arctan2(-(du2_rotor), U_rotor)
-            return skew_angle
-
+### Sheltered formulation
 def _frac(t, sp: SolverParams):
     idx = jnp.clip((t - sp.ts[0]) / (sp.ts[1] - sp.ts[0]), 0.0, sp.ts.size - 1.0)
     i   = jnp.clip(jnp.floor(idx).astype(int), 0, sp.ts.size - 2)
