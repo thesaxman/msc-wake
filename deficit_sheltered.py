@@ -8,7 +8,7 @@ __date__ = "5/8/2026"
 
 import jax.numpy as jnp
 from model_params import wake_params as wp, solver_params as sp, turbines
-from unsteady_flow_solver import advecting_sheltered_d_dt, default_d_dt, solver
+from unsteady_flow_solver import advecting_sheltered_d_dt, solver
 from video_utils import WakeSeries, with_field, full_video
 
 
