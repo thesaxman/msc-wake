@@ -3,8 +3,6 @@
 __author__ = "Ali Alebeedan"
 __date__ = "29/7/2026"
 
-import dataclasses
-
 import jax.numpy as jnp
 from model_params import wake_params as wp, solver_params as sp, turbines
 from unsteady_flow_solver import default_d_dt, solver, sheltered_d_dt
@@ -12,7 +10,7 @@ from unsteady_flow_solver import default_d_dt, solver, sheltered_d_dt
 from video_utils import WakeSeries, with_field, full_video
 
 
-solutions = []
+solutions = [(jnp.zeros(sp.nt,sp.nx), jnp.zeros(sp.nt,sp.nx), jnp.zeros(sp.nt,sp.nx))]
 y0 = (jnp.zeros(sp.nx), jnp.zeros(sp.nx), jnp.zeros(sp.nx))
 
 u1_xt1, u2_xt1, yc_xt1 = solver(y0, default_d_dt([turbines[0]], sp), sp).ys
@@ -33,4 +31,4 @@ if __name__ == "__main__":
         y_grid,
     )
 
-    full_video(series_list, 'two_turbine_sheltered.mp4')
+    full_video(series_list, f'{len(turbines)}_turbine_sheltered.mp4')
