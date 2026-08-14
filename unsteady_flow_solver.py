@@ -159,22 +159,15 @@ def advecting_d_dt(turbines: list[Turbine], sp: SolverParams):
 
     return rhs
 
-def skew_du1_0(t, p: WakeParams, skew_angle_deg: float):
-    gamma  = p.gamma_at(t)
-    skew_angle_rad = jnp.radians(skew_angle_deg)
-    return p.UINF*(1-jnp.sqrt(1-p.Ct*jnp.cos(gamma)**2 * jnp.cos(skew_angle_rad)**2))
+def skew_at(U_rotor, du2_rotor):
+            """Compute the effective skew angle (in radians) at time t based on the upstream deficit and centerline deflection."""
+            skew_angle = jnp.arctan2(-(du2_rotor), U_rotor)
+            return skew_angle
 
-def S1_sheltered(t, du1, wp: WakeParams, sp: SolverParams, tb: Turbine, du1_xt0: jnp.ndarray ):
-    #upstream deficit at turbine 2's location at time t
-    du1_up = jnp.interp(t, sp.ts, du1_xt0[:, turbine_index(tb, sp)])
-    p_local = dataclasses.replace(wp, UINF=wp.UINF - du1_up)
-    return S1_default(t, du1, p_local)
-
-def S2_sheltered(t, du1, wp: WakeParams, sp: SolverParams, tb: Turbine, du1_xt0: jnp.ndarray):
-    #upstream deficit at turbine 2's location at time t
-    du1_up = jnp.interp(t, sp.ts, du1_xt0[:, turbine_index(tb, sp)])
-    p_local = dataclasses.replace(wp, UINF=wp.UINF - du1_up)
-    return S2_default(t, du1, p_local)
+def _frac(t, sp: SolverParams):
+    idx = jnp.clip((t - sp.ts[0]) / (sp.ts[1] - sp.ts[0]), 0.0, sp.ts.size - 1.0)
+    i   = jnp.clip(jnp.floor(idx).astype(int), 0, sp.ts.size - 2)
+    return i, idx - i
 
 def sheltered_d_dt(tb: Turbine, sp: SolverParams, solutions: list[jnp.ndarray], skew: bool = False):
     """Couple RHS: strictly one turbine is sheltered by the upstream deficit of the other turbine, so we need to compute the upstream deficit at the sheltered turbine's location and adjust its forcing accordingly.
@@ -187,31 +180,20 @@ def sheltered_d_dt(tb: Turbine, sp: SolverParams, solutions: list[jnp.ndarray], 
 
     #precompute forcing spatial terms
     wp              = tb.wp
-    G_x             = G(sp.x_grid-tb.x0, tb.wp)
-    expansion_x     = expansion(sp.x_grid-tb.x0, tb.wp)
+    G_x             = G(sp.x_grid-tb.x0, wp)
+    expansion_x     = expansion(sp.x_grid-tb.x0, wp)
     i_rotor         = turbine_index(tb, sp)
-    dt_s, nt        = sp.ts[1]-sp.ts[0], sp.ts.size
-
-    def _frac(t):
-        idx = jnp.clip((t - sp.ts[0]) / dt_s, 0.0, nt - 1.0)
-        i   = jnp.clip(jnp.floor(idx).astype(int), 0, nt - 2)
-        return i, idx - i
 
     def upstream_at(t, yc, du1_xt0, yc_xt0):
         """Linear interp of upstream field in time -> (nx,)"""
-        i, f = _frac(t)
+        i, f = _frac(t, sp)
         du1_interp = ((1.0-f) * du1_xt0[i] + f * du1_xt0[i+1])
         yc_interp = ((1.0-f) * yc_xt0[i] + f * yc_xt0[i+1])
         return u_point(sp.x_grid, yc_interp, du1_interp, yc, t, wp) # returns the upstream deficit profile at time t
     def du2_at(t, du2_xt0):
         """Linear interp of upstream field in time -> (nx,)"""
-        i, f = _frac(t)
+        i, f = _frac(t, sp)
         return (1.0-f) * du2_xt0[i] + f * du2_xt0[i+1] # this gives the spatial profile of upstream du2 at time t
-    if skew:
-        def skew_at(U_rotor, du2_rotor):
-            """Compute the effective skew angle at time t based on the upstream deficit and centerline deflection."""
-            skew_angle = jnp.arctan2(-(du2_rotor), U_rotor)  # Placeholder for actual calculation
-            return skew_angle
     def rhs(t, state, args):
 
         du1, du2, yc = state
@@ -224,7 +206,7 @@ def sheltered_d_dt(tb: Turbine, sp: SolverParams, solutions: list[jnp.ndarray], 
         if skew:
             du2_rotor = du2_up[i_rotor] # scalar - the local du2 at the rotor location of the sheltered turbine
             skew_angle = skew_at(U_rotor, du2_rotor)
-            gamma_effective = wp.gamma_at(t) - skew_angle  # Placeholder for actual control law based on skew angle
+            gamma_effective = wp.gamma_at(t) - skew_angle # Placeholder for actual control law based on skew angle
         else:
             gamma_effective = wp.gamma_at(t)
         cg, sg = jnp.cos(gamma_effective), jnp.sin(gamma_effective)
@@ -258,31 +240,20 @@ def advecting_sheltered_d_dt(tb: Turbine, sp: SolverParams, solutions: list[jnp.
 
     #precompute forcing spatial terms
     wp              = tb.wp
-    G_x             = G(sp.x_grid-tb.x0, tb.wp)
-    expansion_x     = expansion(sp.x_grid-tb.x0, tb.wp)
+    G_x             = G(sp.x_grid-tb.x0, wp)
+    expansion_x     = expansion(sp.x_grid-tb.x0, wp)
     i_rotor         = turbine_index(tb, sp)
-    dt_s, nt        = sp.ts[1]-sp.ts[0], sp.ts.size
-
-    def _frac(t):
-        idx = jnp.clip((t - sp.ts[0]) / dt_s, 0.0, nt - 1.0)
-        i   = jnp.clip(jnp.floor(idx).astype(int), 0, nt - 2)
-        return i, idx - i
 
     def upstream_at(t, yc, du1_xt0, yc_xt0):
         """Linear interp of upstream field in time -> (nx,)"""
-        i, f = _frac(t)
+        i, f = _frac(t, sp)
         du1_interp = ((1.0-f) * du1_xt0[i] + f * du1_xt0[i+1])
         yc_interp = ((1.0-f) * yc_xt0[i] + f * yc_xt0[i+1])
         return u_point(sp.x_grid, yc_interp, du1_interp, yc, t, wp) # returns the upstream deficit profile at time t
     def du2_at(t, du2_xt0):
         """Linear interp of upstream field in time -> (nx,)"""
-        i, f = _frac(t)
+        i, f = _frac(t, sp)
         return (1.0-f) * du2_xt0[i] + f * du2_xt0[i+1]  # this gives the spatial profile of upstream du2 at time t
-    if skew:
-        def skew_at(du1, du2, U_rotor, du2_rotor):
-            """Compute the effective skew angle at time t based on the upstream deficit and centerline deflection."""
-            skew_angle = jnp.arctan2(-(du2_rotor+du2), U_rotor-du1)
-            return skew_angle
 
     def rhs(t, state, args):
 
@@ -296,27 +267,28 @@ def advecting_sheltered_d_dt(tb: Turbine, sp: SolverParams, solutions: list[jnp.
 
         if skew:
             du2_rotor = du2_up[i_rotor]
-            skew_angle = skew_at(du1, du2, U_rotor, du2_rotor)
-            gamma_effective = wp.gamma_at(t) - skew_angle  # Placeholder for actual control law based on skew angle
+            skew_angle = skew_at(U_rotor, du2_rotor)
+            gamma_effective = wp.gamma_at(t) - skew_angle # Placeholder for actual control law based on skew angle
         else:
             gamma_effective = wp.gamma_at(t)
         cg, sg = jnp.cos(gamma_effective), jnp.sin(gamma_effective)
+        #It may be argued that the value of U_rotor should be matched to U_local however from the momentum theory the value of du1_0 is dependent on the undisturbed freestream velocity. The current choice takes the stance of only applying U_local to the advection term and using U_rotor for the forcing term.
         S1 = U_local * U_rotor * (1-jnp.sqrt(1-wp.Ct*cg**2))
         S2 = U_local * U_rotor * (0.25*wp.Ct*cg**2 * sg)
-
+        
         #advection terms
-        adv_du1 = -U_local * d_dx_upwind(du1, (U_up - du1), sp.dx)
-        adv_du2 = -U_local * d_dx_upwind(du2, (U_up - du1), sp.dx)
-        adv_yc = -U_local * d_dx_upwind(yc, (U_up - du1), sp.dx)
-
+        adv_du1 = -U_local * d_dx_upwind(du1, U_local, sp.dx)
+        adv_du2 = -U_local * d_dx_upwind(du2, U_local, sp.dx)
+        adv_yc = -U_local * d_dx_upwind(yc, U_local, sp.dx)
+        
         #forcing terms
         src_du1 = -U_local * expansion_x * du1 + S1 * G_x
         src_du2 = -U_local * expansion_x * du2 + S2 * G_x
-
+        
         ddu1_dt = adv_du1 + src_du1
         ddu2_dt = adv_du2 + src_du2
         dyc_dt = adv_yc - (du2+du2_up) # du2 is coupled to the centerline deflection equation
-
+        
         return (ddu1_dt, ddu2_dt, dyc_dt)
     return rhs
 
