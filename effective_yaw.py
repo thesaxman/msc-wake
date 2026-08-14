@@ -15,7 +15,7 @@ from video_utils import WakeSeries, with_field, full_video
 solutions = [(jnp.zeros((sp.nt,sp.nx)), jnp.zeros((sp.nt,sp.nx)), jnp.zeros((sp.nt,sp.nx)))]
 y0 = (jnp.zeros((sp.nx,)), jnp.zeros((sp.nx,)), jnp.zeros((sp.nx,)))
 for tb in turbines:
-    solutions.append(solver(y0, sheltered_d_dt(tb, sp, solutions),sp).ys)
+    solutions.append(solver(y0, sheltered_d_dt(tb, sp, solutions, skew=True),sp).ys)
 solutions.pop(0)
 
 if __name__ == "__main__":
