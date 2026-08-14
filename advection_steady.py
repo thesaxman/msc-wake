@@ -10,7 +10,7 @@ import jax.numpy as jnp
 from diffrax import Tsit5, PIDController, diffeqsolve, ODETerm, SaveAt
 from model_params import wake_params as wp, turbines
 from wake_dynamics import G, A, dA_dx, u_point
-from unsteady_flow_solver import delta_u1_0, delta_u2_0, Turbine, make_turbine
+from unsteady_flow_solver import du1_0, du2_0, Turbine, make_turbine
 
 turbines[0] = make_turbine(wp, 0.0, gamma_deg=-15.0)
 g = turbines[0].wp.gamma_deg
@@ -21,7 +21,7 @@ filename  = f"outputs/full_wake_adv_v_shap_{sign}{g}deg.png"
 def solve_steady_u1(p: Turbine):
     
     def du1_dx(x, u1, args): # ODE for u1 definition
-        return -dA_dx(x, p.wp)/A(x, p.wp)*u1 + delta_u1_0(0.0, p.wp)*G(x, p.wp)
+        return -dA_dx(x, p.wp)/A(x, p.wp)*u1 + du1_0(0.0, p.wp)*G(x, p.wp)
     
     u1_sol = diffeqsolve(ODETerm(du1_dx), Tsit5(),
                          t0=p.wp.upstream_bound, t1=p.wp.boundary, dt0=0.01, y0=0.0,
@@ -34,7 +34,7 @@ def solve_steady_u1(p: Turbine):
 def solve_steady_u2(p: Turbine):
     
     def du2_dx(x, u2, args): # ODE for u1 definition
-        return -dA_dx(x, p.wp)/A(x, p.wp)*u2 + delta_u2_0(0.0, p.wp)*G(x, p.wp)
+        return -dA_dx(x, p.wp)/A(x, p.wp)*u2 + du2_0(0.0, p.wp)*G(x, p.wp)
     
     u2_sol = diffeqsolve(ODETerm(du2_dx), Tsit5(),
                          t0=p.wp.upstream_bound, t1=p.wp.boundary, dt0=0.01, y0=0.0,
