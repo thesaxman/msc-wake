@@ -16,6 +16,7 @@ solutions = [(jnp.zeros((sp.nt,sp.nx)), jnp.zeros((sp.nt,sp.nx)), jnp.zeros((sp.
 y0 = (jnp.zeros((sp.nx,)), jnp.zeros((sp.nx,)), jnp.zeros((sp.nx,)))
 for tb in turbines:
     solutions.append(solver(y0, advecting_sheltered_d_dt(tb, sp, solutions),sp).ys)
+solutions.pop(0)
 
 if __name__ == "__main__":
 

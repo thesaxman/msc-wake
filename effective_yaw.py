@@ -7,21 +7,16 @@ __date__ = "07/08/2026"
 
 import jax.numpy as jnp
 from model_params import wake_params as wp, solver_params as sp, turbines
-from unsteady_flow_solver import default_d_dt, solver, sheltered_d_dt
+from unsteady_flow_solver import solver, sheltered_d_dt
 
 from video_utils import WakeSeries, with_field, full_video
 
 
-solutions = []
-y0 = (jnp.zeros(sp.nx), jnp.zeros(sp.nx), jnp.zeros(sp.nx))
-
-u1_xt1, u2_xt1, yc_xt1 = solver(y0, default_d_dt([turbines[0]], sp), sp).ys
-
-solutions.append((u1_xt1, u2_xt1, yc_xt1))
-
-if len(turbines) > 1:
-    for tb in turbines[1:]:
-        solutions.append(solver(y0, sheltered_d_dt(tb, sp, solutions, skew=True),sp).ys)
+solutions = [(jnp.zeros((sp.nt,sp.nx)), jnp.zeros((sp.nt,sp.nx)), jnp.zeros((sp.nt,sp.nx)))]
+y0 = (jnp.zeros((sp.nx,)), jnp.zeros((sp.nx,)), jnp.zeros((sp.nx,)))
+for tb in turbines:
+    solutions.append(solver(y0, sheltered_d_dt(tb, sp, solutions),sp).ys)
+solutions.pop(0)
 
 if __name__ == "__main__":
 
