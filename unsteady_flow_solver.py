@@ -1,5 +1,6 @@
 
 from collections.abc import Callable
+from typing import Optional
 import dataclasses
 #from functools import partial
 
@@ -101,13 +102,38 @@ def turbine_index(tb: Turbine, sp: SolverParams):
 
 ### Shapiro methodology
 
-def default_d_dt(turbines: list[Turbine], sp: SolverParams):
+def default_d_dt(turbines: list[Turbine], sp: SolverParams, solutions: Optional[list] = None, skew: bool = False):
     """Couple RHS: all turbines share one flow field,
-    their forcing and expansion effects superpose additively."""
+    their forcing and expansion effects superpose additively.
+
+    solutions: optional list of upstream turbines' already-solved (du1, du2, yc)
+    tuples (oldest to current), used only to compute a per-turbine skew angle when
+    skew=True -- mirrors sheltered_d_dt's skew mechanism, but leaves the (deficit-
+    independent) advection assumption that defines this model untouched. Omitting
+    solutions/skew reproduces the previous behaviour exactly."""
 
     #precompute forcing spatial terms
     G_xs            = [G(sp.x_grid-tb.x0, tb.wp)         for tb in turbines]
     expansion_xs    = [expansion(sp.x_grid-tb.x0, tb.wp) for tb in turbines]
+    i_rotors        = [turbine_index(tb, sp)             for tb in turbines]
+
+    solutions       = solutions or []
+    du1_up          = [sol[0] for sol in solutions]
+    yc_up           = [sol[2] for sol in solutions]
+    du2_up_sum      = sum(sol[1] for sol in solutions) if solutions else None
+
+    def upstream_at(t, yc, du1_xt0, yc_xt0, wp):
+        """Linear interp of upstream field in time -> (nx,)"""
+        i, f = _frac(t, sp)
+        du1_interp = ((1.0-f) * du1_xt0[i] + f * du1_xt0[i+1])
+        yc_interp = ((1.0-f) * yc_xt0[i] + f * yc_xt0[i+1])
+        return u_point(sp.x_grid, yc_interp, du1_interp, yc, t, wp)
+
+    def du2_at(t, du2_xt0):
+        """Linear interp of upstream field in time -> (nx,)"""
+        i, f = _frac(t, sp)
+        return (1.0-f) * du2_xt0[i] + f * du2_xt0[i+1]
+
     def rhs(t, state, args):
 
         du1, du2, yc = state
@@ -118,10 +144,24 @@ def default_d_dt(turbines: list[Turbine], sp: SolverParams):
         adv_yc = -turbines[0].wp.UINF * d_dx(yc, sp.dx)
 
         #forcing terms
-        src_du1 = sum(-tb.wp.UINF * ex * du1 + sp.S1(t, du1, tb.wp) * Gx
-                     for tb, ex, Gx in zip (turbines, expansion_xs, G_xs))
-        src_du2 = sum(-tb.wp.UINF * ex * du2 + sp.S2(t, du1, tb.wp) * Gx
-                     for tb, ex, Gx in zip (turbines, expansion_xs, G_xs))
+        src_du1 = 0.0
+        src_du2 = 0.0
+        for tb, ex, Gx, i_rotor in zip(turbines, expansion_xs, G_xs, i_rotors):
+            if skew and solutions:
+                U_rotor = tb.wp.UINF - sum(
+                    upstream_at(t, yc, du1_xt0, yc_xt0, tb.wp)[i_rotor]
+                    for du1_xt0, yc_xt0 in zip(du1_up, yc_up)
+                )
+                du2_rotor = du2_at(t, du2_up_sum)[i_rotor]
+                gamma_eff = tb.wp.gamma_at(t) - skew_at(U_rotor, du2_rotor)
+                cg, sg = jnp.cos(gamma_eff), jnp.sin(gamma_eff)
+                S1_t = tb.wp.UINF * (tb.wp.UINF*(1-jnp.sqrt(1-tb.wp.Ct*cg**2)))
+                S2_t = tb.wp.UINF * (tb.wp.UINF*(0.25*tb.wp.Ct*cg**2 * sg))
+            else:
+                S1_t = sp.S1(t, du1, tb.wp)
+                S2_t = sp.S2(t, du1, tb.wp)
+            src_du1 += -tb.wp.UINF * ex * du1 + S1_t * Gx
+            src_du2 += -tb.wp.UINF * ex * du2 + S2_t * Gx
 
 
         ddu1_dt = adv_du1 + src_du1
@@ -140,14 +180,37 @@ def adv_S1(t, du1, wp: WakeParams):
 def adv_S2(t, du1, wp: WakeParams):
     return (wp.UINF - du1) * du2_0(t, wp)
 
-def advecting_d_dt(turbines: list[Turbine], sp: SolverParams):
+def advecting_d_dt(turbines: list[Turbine], sp: SolverParams, solutions: Optional[list] = None, skew: bool = False):
     """Couple RHS: all turbines share one flow field,
-    their forcing and expansion effects superpose additively."""
+    their forcing and expansion effects superpose additively.
+
+    solutions/skew: see default_d_dt -- same skew mechanism, applied on top of the
+    deficit-aware advection that distinguishes this model. Omitting them reproduces
+    the previous behaviour exactly."""
 
     #precompute forcing spatial terms
     G_xs            = [G(sp.x_grid-tb.x0, tb.wp)         for tb in turbines]
     expansion_xs    = [expansion(sp.x_grid-tb.x0, tb.wp) for tb in turbines]
+    i_rotors        = [turbine_index(tb, sp)             for tb in turbines]
     UINF = turbines[0].wp.UINF
+
+    solutions       = solutions or []
+    du1_up          = [sol[0] for sol in solutions]
+    yc_up           = [sol[2] for sol in solutions]
+    du2_up_sum      = sum(sol[1] for sol in solutions) if solutions else None
+
+    def upstream_at(t, yc, du1_xt0, yc_xt0, wp):
+        """Linear interp of upstream field in time -> (nx,)"""
+        i, f = _frac(t, sp)
+        du1_interp = ((1.0-f) * du1_xt0[i] + f * du1_xt0[i+1])
+        yc_interp = ((1.0-f) * yc_xt0[i] + f * yc_xt0[i+1])
+        return u_point(sp.x_grid, yc_interp, du1_interp, yc, t, wp)
+
+    def du2_at(t, du2_xt0):
+        """Linear interp of upstream field in time -> (nx,)"""
+        i, f = _frac(t, sp)
+        return (1.0-f) * du2_xt0[i] + f * du2_xt0[i+1]
+
     def rhs(t, state, args):
 
         du1, du2, yc = state
@@ -159,10 +222,26 @@ def advecting_d_dt(turbines: list[Turbine], sp: SolverParams):
         adv_yc = -(UINF - du1) * d_dx_upwind(yc, (UINF - du1), sp.dx)
 
         #forcing terms
-        src_du1 = sum(-(tb.wp.UINF -du1) * ex * du1 + sp.S1(t, du1, tb.wp) * Gx
-                     for tb, ex, Gx in zip (turbines, expansion_xs, G_xs))
-        src_du2 = sum(-(tb.wp.UINF - du1) * ex * du2 + sp.S2(t, du1, tb.wp) * Gx
-                     for tb, ex, Gx in zip (turbines, expansion_xs, G_xs))
+        src_du1 = 0.0
+        src_du2 = 0.0
+        for tb, ex, Gx, i_rotor in zip(turbines, expansion_xs, G_xs, i_rotors):
+            if skew and solutions:
+                U_rotor = tb.wp.UINF - sum(
+                    upstream_at(t, yc, du1_xt0, yc_xt0, tb.wp)[i_rotor]
+                    for du1_xt0, yc_xt0 in zip(du1_up, yc_up)
+                )
+                du2_rotor = du2_at(t, du2_up_sum)[i_rotor]
+                gamma_eff = tb.wp.gamma_at(t) - skew_at(U_rotor, du2_rotor)
+                cg, sg = jnp.cos(gamma_eff), jnp.sin(gamma_eff)
+                du1_0_t = tb.wp.UINF*(1-jnp.sqrt(1-tb.wp.Ct*cg**2))
+                du2_0_t = tb.wp.UINF*(0.25*tb.wp.Ct*cg**2 * sg)
+                S1_t = (tb.wp.UINF - du1) * du1_0_t
+                S2_t = (tb.wp.UINF - du1) * du2_0_t
+            else:
+                S1_t = sp.S1(t, du1, tb.wp)
+                S2_t = sp.S2(t, du1, tb.wp)
+            src_du1 += -(tb.wp.UINF - du1) * ex * du1 + S1_t * Gx
+            src_du2 += -(tb.wp.UINF - du1) * ex * du2 + S2_t * Gx
 
 
         ddu1_dt = adv_du1 + src_du1
