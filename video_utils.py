@@ -186,6 +186,7 @@ def _draw_field(ax, fig, series_list: list, *, diff: bool, percent: bool,
     x_norm = series_list[0].x_grid / wp.D
     y_norm = series_list[0].y_grid / wp.D
     frames = np.sum(np.stack([s.frames for s in series_list], axis=0), axis=0)
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
     cbar_kwargs = dict(location=colorbar_loc)
     if colorbar_shrink is not None:
@@ -199,25 +200,34 @@ def _draw_field(ax, fig, series_list: list, *, diff: bool, percent: bool,
             cbar_kwargs['label'] = r'$\Delta u_1/\delta u_{1,\mathrm{env}}$'
         else:
             cbar_kwargs['label'] = r'$\Delta u_1$'
-        cl_label = r'$\Delta y_c$'
     else:
         mesh = ax.pcolormesh(x_norm, y_norm, frames[0], cmap='plasma', shading='auto', vmin=0, vmax=frames.max())
         cbar_kwargs['label'] = r'$\delta u_1$ [m/s]'
         cl_label = 'Unsteady $y_c$' if steady is not None else '$y_c$'
 
     fig.colorbar(mesh, ax=ax, **cbar_kwargs)
-    cl_lines = [
-        ax.plot(x_norm, s.yc_xt[0] / wp.D, 'w--', lw=1.2,
-                label=f'Turbine {i+1}' if multi else cl_label)[0]
-        for i, s in enumerate(series_list)
-    ]
+
+    # centrelines don't add information on a diff plot (there's no single "the" wake
+    # to trace) -- only draw them for the non-diff field view, colour-matched to each
+    # turbine's profile lines below so it's clear which centreline is which turbine.
+    cl_lines = []
+    if not diff:
+        cl_lines = [
+            ax.plot(x_norm, s.yc_xt[0] / wp.D, '--', color=colors[i % len(colors)], lw=1.2,
+                    label=f'Turbine {i+1}' if multi else cl_label)[0]
+            for i, s in enumerate(series_list)
+        ]
 
     if steady is not None:
         ax.plot(x_norm, steady.yc_x / wp.D, 'r--', lw=1.0, label=steady.label)
 
     ax.set_ylabel(r'$y/D$')
-    ax.legend(loc='upper right')
-    timestamp = ax.text(0.02, 0.92, '', transform=ax.transAxes, color='w')
+    if cl_lines or steady is not None:
+        ax.legend(loc='upper right')
+    # bbox guarantees the label reads over both the dark plasma colormap and the
+    # near-white centre of the diverging RdBu_r diff colormap.
+    timestamp = ax.text(0.02, 0.92, '', transform=ax.transAxes, color='w',
+                         bbox=dict(boxstyle='round,pad=0.25', facecolor='black', alpha=0.45, edgecolor='none'))
     return mesh, cl_lines, frames, timestamp
 
 
@@ -226,14 +236,16 @@ def _draw_profiles(ax_u1, ax_u2, ax_yc, series_list: list, *, diff: bool,
     multi = len(series_list) > 1
     x_norm = series_list[0].x_grid / series_list[0].tb.wp.D
     yc_scale = 1.0 if diff else (100.0 if yc_cm else 1.0)  # yc_xt is stored in metres
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
     u1_lines, u2_lines, yc_lines = [], [], []
     u1_refs, u2_refs, yc_refs = [], [], []
     for i, s in enumerate(series_list):
+        color = colors[i % len(colors)]
         label = f'Turbine {i+1}' if multi else ('Unsteady' if steady is not None else None)
-        u1_line, = ax_u1.plot(x_norm, s.u1_xt[0], lw=1.2)
-        u2_line, = ax_u2.plot(x_norm, s.u2_xt[0], lw=1.2)
-        yc_line, = ax_yc.plot(x_norm, s.yc_xt[0] * yc_scale, lw=1.2, label=label)
+        u1_line, = ax_u1.plot(x_norm, s.u1_xt[0], lw=1.2, color=color)
+        u2_line, = ax_u2.plot(x_norm, s.u2_xt[0], lw=1.2, color=color)
+        yc_line, = ax_yc.plot(x_norm, s.yc_xt[0] * yc_scale, lw=1.2, color=color, label=label)
         u1_lines.append(u1_line)
         u2_lines.append(u2_line)
         yc_lines.append(yc_line)
